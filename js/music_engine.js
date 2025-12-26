@@ -556,7 +556,6 @@ export class MusicEngine{
      */
     async setInstrumentVisibility(){
         document.body.setAttribute("data-loading", "DATA IS THERE");
-        console.log("START FLASH", Date.now(), document.body.getAttribute("data-loading"))
         let hiddenInstruments = [];
         let cssSelectors = [];
         this.sheetData.staffInstrumentMap.internal = {};
@@ -636,8 +635,6 @@ export class MusicEngine{
         await this.stop();
         this.#loadPayerData();
         document.body.removeAttribute("data-loading");
-        console.log("STOP FLASH", Date.now(), document.body.getAttribute("data-loading"));
-
     }
 
     async settings(){
@@ -757,7 +754,6 @@ export class MusicEngine{
         
         if(dialogContent.submit){
             const data = dialogContent.data;
-            console.log(data);
             this.sheetData.options.mode = data.mode;
             this.sheetData.options.skipRest = data.skipRest;
             this.sheetData.options.noteAnalyse = data.noteAnalyse;

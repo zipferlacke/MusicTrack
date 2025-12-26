@@ -48,9 +48,18 @@
     <script type="module" defer>;
         import {userDialog} from "/wuefl-libs/js/userDialog.js";
 		import {MusicEngine} from "./js/music_engine.js";
+        import {MusicDB} from "./js/music_db.js";
+        import {initialServiceWorker} from "./js/sw-functions.js"
+        
 
 		async function start(){
 			try{
+                const db_helper = new MusicDB();
+                await initialServiceWorker({
+                    firstTime:await db_helper.isFirstTime(), 
+                    currentVersion:await db_helper.getAppVersion(),
+                    funcUpdateVersion:async (version)=>{await db_helper.setAppVersion(version);}
+                });
 
 				/**
 				 * @type {MusicEngine}

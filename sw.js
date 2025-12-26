@@ -1,12 +1,11 @@
-// import { MusicDB } from "./js/music_db.js";
-
 const APP_VERSION = 'v1.0.0';
 const illegal = "/sw.js"
 
 // urlsToCache kann jetzt leer sein, da wir alles dynamisch cachen
 const urlsToCache = [
-    "index.html","/", "app.html",
+    "index.html", "/", "app.html",
 ];
+
 async function saveToInboxClassic(file) {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open('MusicAppDB', 2); // Gleiche Version wie in MusicDB
@@ -58,25 +57,30 @@ self.addEventListener('fetch', (event) => {
         return;
     }
     if (event.request.url.includes('/sw.js')) {
-        return; 
+        return;
     }
-	
-    event.respondWith(
-        caches.open(APP_VERSION).then(async (cache) => {
-            const cachedResponse = await cache.match(event.request);
 
+    
+	event.respondWith((async () => {
+        try {
+            const cache = await caches.open(APP_VERSION);
+            const cachedResponse = await cache.match(event.request);
             if(cachedResponse) return cachedResponse;
-			console.log(`[Service Worker] ${APP_VERSION} fetch`, event.request.url)
-            const fetchResponse = await fetch(event.request, { cache: 'no-cache' }).then((networkResponse) => {
-                if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-                    // Den Cache im Hintergrund mit der frischen Server-Version aktualisieren
-                    cache.put(event.request, networkResponse.clone());
-                }
-                return networkResponse;
-            })
-            return fetchResponse;
-        }),
-    );
+            
+            const networkResponse = await fetch(event.request, { cache: 'no-cache' });
+            console.log(cachedResponse, networkResponse);
+            if (networkResponse.ok) cache.put(event.request, networkResponse.clone());
+            return networkResponse;
+
+        } catch (error) {
+            // Falls das Internet weg ist, geben wir eine Fehlermeldung
+            console.error("Netzwerkfehler im SW:", error);
+            return new Response("Du bist offline und diese Datei ist nicht im Cache.", {
+                status: 503,
+                statusText: "Service Unavailable"
+            });
+        }
+    })());
 });
 
 // 3. Activate-Event: Alte Caches aufräumen
@@ -100,12 +104,8 @@ self.addEventListener('activate', event => {
                 );
             }),
 
-            // db_helper.setServiceVersion(APP_VERSION),
-    
-
   
         // Alle Clients finden, die dieser Worker kontrolliert
-
             self.clients.matchAll().then(clients => {
                 clients.forEach(client => {
                     // Sende die Versionsnummer als Nachricht
