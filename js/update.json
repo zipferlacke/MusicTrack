@@ -8,6 +8,14 @@
 
     "changelog":[
         {
+            "version":"1.0.1",
+            "changes":[
+                "1. Fix für Absturz beim abspielen, wenn die Instrumente ein/ausgebelndet wurden.",
+                "2. Deutlich bessere Performance beim Laden vorm abspielen.",
+                "3. Änderung des Standarts beim überspringen von Pausen, von bestätigen zu automatisch überspringen."
+            ]
+        },
+        {
             "version":"1.0.0",
             "changes":[
                 "1. Deutlich verbesserte Notenerkennung und Bewertung (Basiert jetzt auf cents anstatt Frequnzen)",
