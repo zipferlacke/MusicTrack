@@ -10,9 +10,9 @@
         {
             "version":"1.0.1",
             "changes":[
-                "1. Fix für Absturz beim abspielen, wenn die Instrumente ein/ausgebelndet wurden.",
+                "1. Fix für Absturz beim Abspielen, wenn die Instrumente ein/ausgeblendet wurden.",
                 "2. Deutlich bessere Performance beim Laden vorm abspielen.",
-                "3. Änderung des Standarts beim überspringen von Pausen, von bestätigen zu automatisch überspringen."
+                "3. Änderung des Standards beim Überspringen von Pausen, von bestätigen zu automatisch überspringen."
             ]
         },
         {
