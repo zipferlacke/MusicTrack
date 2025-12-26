@@ -78,7 +78,7 @@ export class MusicDB {
             score: 0,
             creationTime: Date.now(),
             lastUsed: Date.now(),
-            options:{mode:"normal", defaultBPM:fileMetaData.defaultBPM, bpm:fileMetaData.currentBPM, firstOpen:true, skipRest:"ask", noteAnalyse:"holding", showNoteNames:[]}
+            options:{mode:"normal", defaultBPM:fileMetaData.defaultBPM, bpm:fileMetaData.currentBPM, firstOpen:true, skipRest:"auto", noteAnalyse:"holding", showNoteNames:[]}
         });await tx.done;
 
         //Buffer wird geschrieben

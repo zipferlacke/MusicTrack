@@ -9,9 +9,9 @@ import { Soundfont } from 'https://cdn.jsdelivr.net/npm/smplr@0.16.3/+esm'
 
 export class MusicEngine{
     /**
-     * @type {{sound:Boolean, analyse:Boolean, state:"idle"|"running"|"paused", playIndex:number, edit:boolean}}
+     * @type {{sound:Boolean, analyse:Boolean, state:"idle"|"running"|"paused", playIndex:number, edit:boolean, load:boolean}}
      */
-    options = {sound:false, analyse:true, state:"idle", playIndex:0, edit:false}
+    options = {sound:false, analyse:true, state:"idle", playIndex:0, edit:false, load:true}
     /**
      * @type {{
      *  htmlElm: {sheetNotes:HTMLElement, sheetScore:HTMLElement, sheetTitle:HTMLElement, sheetComposer:HTMLElement, sheetBPM:HTMLInputElement, sheetSettings:HTMLInputElement, micGraphElm:HTMLCanvasElement, sheetEdit:HTMLElement}, 
@@ -68,12 +68,13 @@ export class MusicEngine{
      * @type {{
      *  activeNotes:{id:string, frequency:number, duration:number, score:Number[], midi:Number},
      *  activeNotesMap:Object<number,{id:string, frequency:number, duration:number, score:Number[], midi:Number}>,
-     *  timestamps: {on:string[]|null, off:string[]|null, tstamp:number}[]
-     *  activeElms:string[]
+     *  timestamps: {on:string[]|null, off:string[]|null, tstamp:number}[],
+     *  activeRests:string[],
+     *  skipRests:Object<number, number>,
+     *  instrumentFontByStaff: Object<string, Soundfont>
      * }}
      */
-    musicData = {activeNotes:[], activeNotesMap:{}, timestamps:[], activeElms:[]};
-    instrumentFontByStaff = {}
+    musicData = {activeNotes:[], activeNotesMap:{}, timestamps:[], activeRests:[], skipRests:[], instrumentFontByStaff:{}};
 
     /**
      * Eine MusicEngine wird erstellt.
@@ -115,7 +116,10 @@ export class MusicEngine{
         this.sheetData.instruments = rawSheetMataData.instruments;
         this.sheetData.staffInstrumentMap = rawSheetMataData.staffInstrumentMap;
 		this.sheetData.htmlElm.sheetScore.innerHTML = `<progress max="1" value="${this.sheetData.score.value}"></progress><span>${(this.sheetData.score.value*100).toFixed(0)}/100</span>`;
-        
+        for (const staffId of Object.keys(this.sheetData.staffInstrumentMap)){
+            if(staffId == "internal") continue;
+            this.musicData.instrumentFontByStaff[staffId] = await new Soundfont(this.audioCTX, {instrument: midiInstumentTable[this.sheetData.staffInstrumentMap[staffId].midiNumber]}).load;
+        }
         
         if(sheet == null){
             userDialog({
@@ -211,15 +215,13 @@ export class MusicEngine{
         document.body.setAttribute("data-loading", "");
         console.log("start");
         this.musicData.activeNotes = [];
+        this.musicData.activeNotesMap = {};
+        this.musicData.activeRests = [];
+
         this.sheetData.htmlElm.sheetNotes.dataset.playing = true;
         if(this.options.state == "idle"){
             this.musicData.timestamps = this.musicSheet.renderPlay();
             this.sheetData.style.notesValidationCss.textContent = "";
-            for(const key of Object.keys(this.midiData.instruments)){
-                this.instrumentFontByStaff[key] = await this.midiData.instruments[key];
-            }
-
-            this.sheetData.skipRests = this.midiData.skipRests;
         }
 
         if(this.options.analyse) await this.micAnalyser.startListinig();
@@ -271,7 +273,7 @@ export class MusicEngine{
         if(this.options.state != "running") return;
         this.micAnalyser.setFrequencyData(this.options.analyse ? this.musicData.activeNotes : []);
         
-        const skipToTime = this.sheetData.skipRests[this.musicData.timestamps[this.options.playIndex].tstamp] 
+        const skipToTime = this.musicData.skipRests[this.musicData.timestamps[this.options.playIndex].tstamp] 
         if(skipToTime){
             let i = this.options.playIndex+1; 
             for(i; i<this.musicData.timestamps.length; i++){
@@ -295,7 +297,7 @@ export class MusicEngine{
         const offRestEvents = currentTimeStamp.restsOff;
         
         if(offRestEvents){
-            this.musicData.activeElms = this.musicData.activeElms.filter(itemA => !offRestEvents.some(itemB => itemB === itemA));
+            this.musicData.activeRests = this.musicData.activeRests.filter(itemA => !offRestEvents.some(itemB => itemB === itemA));
         }
 
         if(offEvents){
@@ -327,17 +329,18 @@ export class MusicEngine{
                 }
 
                 if(this.options.sound){
-                    this.playSound(midi.staff, midi.pitch, midi.duration)
+                    this.playSound(realStaff, midi.pitch, midi.duration)
                 }
             }
         }
         if(onRestEvents){
-            this.musicData.activeElms = this.musicData.activeElms.concat(onRestEvents);
+            this.musicData.activeRests = this.musicData.activeRests.concat(onRestEvents);
         }
         
 
-        const allActiveCompontents = this.musicData.activeElms.concat(Object.keys(this.musicData.activeNotesMap));
+        const allActiveCompontents = this.musicData.activeRests.concat(Object.keys(this.musicData.activeNotesMap));
         this.#scrollToNote(allActiveCompontents[allActiveCompontents.length-1]);
+        console.log(allActiveCompontents, this.musicData.activeNotesMap, this.sheetData.staffInstrumentMap);
         this.musicSheet.highlightNotes(allActiveCompontents);
         
         this.options.playIndex ++;
@@ -349,7 +352,7 @@ export class MusicEngine{
     }
 
     async #loadPayerData(){
-        const skipTimes = {};
+        this.musicData.skipRests = {};
         let lastTime = 0;
         for(const elm of this.musicData.timestamps){
 
@@ -362,21 +365,13 @@ export class MusicEngine{
                     const staff = this.musicSheet.getStaff(noteId);
                     if(this.sheetData.staffInstrumentMap[this.sheetData.staffInstrumentMap.internal[staff]].visible){
                         if(elm.tstamp - lastTime > 60000/this.sheetData.options.bpm*6){
-                            skipTimes[lastTime] = elm.tstamp - 60000/this.sheetData.options.bpm*6;
+                            this.musicData.skipRests[lastTime] = elm.tstamp - 60000/this.sheetData.options.bpm*6;
                         }
                     }
 
                 }
             }
         }
-        
-        const instrumentsByStaff = {}
-        for (const staffId of Object.keys(this.sheetData.staffInstrumentMap)){
-            if(staffId == "internal") continue;
-            instrumentsByStaff[staffId] = new Soundfont(this.audioCTX, {instrument: midiInstumentTable[this.sheetData.staffInstrumentMap[staffId].midiNumber]}).load;
-        }
-        /**@type {{instruments:{<string>:Promise<Soundfont>}, skipRests:Object<number, number>}} */
-        this.midiData = {instruments: instrumentsByStaff, skipRests: skipTimes};
     }
 
     async #noteTab(e){
@@ -386,12 +381,10 @@ export class MusicEngine{
 
             if(!this.options.edit){
                 const midiValue = this.musicSheet.highlightNotes([note.getAttribute("id")]).list[0];
-                midiValue.pitch += this.sheetData.staffInstrumentMap[this.sheetData.staffInstrumentMap.internal[midiValue.staff]].transSemi
+                const realStaff = this.sheetData.staffInstrumentMap.internal[midiValue.staff];
+                midiValue.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi
                 this.options.playIndex = this.musicData.timestamps.findIndex( timestamp => timestamp.tstamp >= midiValue.time);
-                for(const key of Object.keys(this.midiData.instruments)){
-                    this.instrumentFontByStaff[key] = await this.midiData.instruments[key];
-                }
-                this.playSound(midiValue.staff, midiValue.pitch, midiValue.duration);
+                this.playSound(realStaff, midiValue.pitch, midiValue.duration);
             }else{
                 const item = this.sheetData.noteAnnotations.find(e => e.id === note.id);
                 const html = `<input type="text" value="${item?item.text:""}" name="text">`;
@@ -423,7 +416,7 @@ export class MusicEngine{
      * @param {number} pitchDuration - ms
      */
     playSound(staff, pitch, pitchDuration){
-        this.instrumentFontByStaff[staff].start({
+        this.musicData.instrumentFontByStaff[staff].start({
             note: pitch, // Die MIDI Note Number
             velocity: 100, // Die Anschlagstärke (0-127)
             duration: pitchDuration/1000
@@ -753,7 +746,9 @@ export class MusicEngine{
 
         
         if(dialogContent.submit){
+            
             const data = dialogContent.data;
+            console.log(data);
             this.sheetData.options.mode = data.mode;
             this.sheetData.options.skipRest = data.skipRest;
             this.sheetData.options.noteAnalyse = data.noteAnalyse;
