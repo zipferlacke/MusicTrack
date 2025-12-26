@@ -1,0 +1,7 @@
+{
+    "v1.0.0":"1. Deutlich verbesserte Notenerkennung und Bewertung (Basiert jetzt auf cents anstatt Frequnzen)<br> 2. Notenfarbe wird bei Neustart zurückgesetzt. <br> 3. Einstellungen werden gespeichert und beim nächsten mal genauso geöffnet. <br>4. Deutlich verbesserter Abspielmodus. 5. Deutlich verbesserter Klang",
+    "v0.9.3":"1. Komplexe MXL-Files werden jetzt korrekt entpackt und dargestellt<br>2. Start und Stopknopf wechseln auch für den Benutzer<br>3. Beim File löschen gibt es jetzt ein Bestätigungsdialog.",
+    "v0.9.2":"Musiknoten werden jetzt korrekt dargestellt (Bitte nochmal hochladen)",
+    "v0.9.1":"Lange Pausen können Übersprungen werden.",
+    "v0.9.0":"Start vom MusicTrack"
+}

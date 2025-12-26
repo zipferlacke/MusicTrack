@@ -1,0 +1,97 @@
+@import "/wuefl-libs/css/import.css";
+
+/* Defaults */
+@import "./colors.css"                   layer(defaults);
+
+@layer custom{
+    :root {
+        /*Size*/
+        --width-small: 800px;
+        --width-normal: 1000px;
+        --width-large: 1200px;
+        --width-full: 100%;
+
+        --font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;;
+        --text-size: var(--fs-300);
+        --text-color: var(--clr-neutral-900);
+        --text-hover: var(--clr-neutral-700);
+        --text-height: 1.6;
+        
+        --bg-default: var(--clr-neutral-50);
+        --br-default: 1rem;
+        
+        /*Überschriften*/
+        --clr-headings: var(--clr-primary-900);
+
+        /*Header*/
+        --header-height: 4rem;
+        --header-nav-height: 0rem;
+        --bg-header: var(--clr-primary-600);
+        --bg-header-nav: var(--clr-primary-500);
+        --clr-header: var(--clr-primary-100);
+        --clr-header-nav: var(--clr-primary-900);
+
+        /*Footer*/
+        --nav-bottom-height: 3.5rem;
+
+        /*Nav*/
+        --clr-nav: var(--text-color);
+        --clr-nav-accent: var(--clr-secondary-900);
+
+        --footer-nav-items: 3;
+
+        /*Inputs*/
+        --fs-input: var(--text-size);
+        --bg-input: var(--clr-primary-300);
+        --bg-input-hover: var(--clr-primary-400);
+        --bg-input-selected: var(--clr-primary-600);
+        --clr-input: var(--clr-neutral-800);
+        --clr-input-selected: var(--clr-neutral-300);
+        --br-input: var(--br-default);
+        --input-height: 2.25rem;
+
+        /*Images*/
+        --img-aspect-ratio: 16/9;
+
+        /*Sidebar*/
+        --bg-sidemenue-blur: var(--clr-neutral-200);
+        --bg-sidemenu: var(--bg-header);
+
+
+        /*Dialog*/
+        --bg-dialog-close: var(--clr-danger-500);
+        --bg-dialog-close-hover: var(--clr-danger-600);
+
+        --clr-dialog-submit: var(--clr-neutral-100);
+        --bg-dialog-submit: var(--clr-primary-900);
+        --bg-dialog-submit-hover: var(--clr-primary-800);
+        
+        /*Picker*/
+
+        --bg-input: var(--clr-primary-300);
+        --bg-input-hover: var(--clr-primary-400);
+        --bg-input-selected: var(--clr-primary-600);
+        --clr-input: var(--clr-neutral-800);
+        --clr-input-selected: var(--clr-neutral-300);
+        --br-input: var(--br-default);
+        --input-height: 2.25rem;
+        
+        --picker-bg: var(--bg-input);
+        --picker-bg-selected: var(--bg-input-selected);
+        --picker-bg-hover: var(--bg-input-hover);
+        --picker-clr: var(--clr-input);
+        --picker-clr-selected: var(--clr-input-selected);
+        --picker-br: var(--br-input);
+        --picker-fs: var(--fs-input:);
+        
+        --slideshow-ratio: none;
+    }
+
+    html, body{
+        font-size: var(--text-size);
+        line-height: var(--text-height);
+        color: var(--text-color);
+        fill: var(--text-color);
+        font-family: var(--font-family);
+    }
+}

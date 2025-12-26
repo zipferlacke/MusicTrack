@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="favicon.svg" type="image/svg">
+    <link rel="apple-touch-icon" href="./appdata/mTrack-512.png">
+    <link rel="stylesheet" href="./css/controll.css">
+    <link rel="stylesheet" href="./css/app.css">
+    <link rel="manifest" href="./js/manifest.json">
+    <script type="module" defer></script>
+    <style class="no_analyse_css"></style>
+    <style class="notes_validation_css"></style>
+    <title>MusicTrack</title>
+</head>
+<body>
+    <header>
+        <div>
+            <a href="./index.html"><button class="button" data-shape="nobackground square"><span class="msr">arrow_back_ios_new</span></button></a>
+            <h1 class="heading-1 sheet_title"></h1>
+        </div>
+        <p class="sheet_composer"></p>
+        <div class="sheet_score"></div>
+
+    </header>
+    <main>
+        <div class="controll"> 
+            <div>
+                <div class="stack" data-active="pause">
+                    <button class="playstart button" data-shape="square"><span class="msr">play_arrow</span></button>
+                    <button class="playpause button" data-shape="square"><span class="msr">pause</span></button>
+                </div>
+                <button class="playstop button" data-shape="square"><span class="msr">stop</span></button>
+                <button class="playVolume button" data-shape="square" data-active="mute"><span class="msr"></span></button>
+            </div>
+
+            <label for="sheet_bpm"><input type="number" name="" id="sheet_bpm">BPM</label>            
+            <button class="button" data-shape="square" id="sheet_settings"><span class="msr">settings</span></button>
+            <button class="button" data-shape="square" id="sheet_edit"><span class="msr">edit</span></button>
+        </div>
+        <div class="notes"></div>
+    </main>
+    
+    <div>
+        <canvas class="scores" style="width: 100%;" width="9000" height="2000"></canvas>
+    </div>
+    <script src="/wuefl-libs/js/selectpicker.min.js"></script>
+    <script type="module" defer>;
+        import {userDialog} from "/wuefl-libs/js/userDialog.js";
+		import {MusicEngine} from "./js/music_engine.js";
+
+		async function start(){
+			try{
+
+				/**
+				 * @type {MusicEngine}
+				*/
+				const musicEngine = new MusicEngine(document.querySelector(".notes"), ".scores");
+				
+
+
+				document.querySelector(".playstart").addEventListener("click", async (e)=>{
+                    const button = e.currentTarget;
+					await musicEngine.start();
+					button.parentElement.dataset.active = "play"
+				})
+				document.querySelector(".playpause").addEventListener("click", async (e)=>{
+                    const button = e.currentTarget;
+                    await musicEngine.pause();
+					button.parentElement.dataset.active = "pause"
+				})
+				document.querySelector(".playstop").addEventListener("click", async (e)=>{
+                    const button = e.currentTarget;
+					await musicEngine.stop();
+					button.parentElement.querySelector(".playstart").parentElement.dataset.active = "pause"
+				})
+				document.querySelector(".playVolume").addEventListener("click", (e)=>{
+					musicEngine.toogleVolume();
+					e.currentTarget.dataset.active = e.currentTarget.dataset.active == "mute"?"unmute":"mute";
+				})
+
+                await musicEngine.init();
+			} catch (error) {
+				// Was passieren soll, wenn ein Fehler auftritt
+				console.error("Es ist ein Fehler passiert:", error);
+                userDialog({
+                    title:"Fehler :(",
+                    type:"error",
+                    content:`<p>
+                    Es ist ein Fehler aufgetreten:\n
+                    ${error}
+                    </p>
+                    `,
+                    confirmText:"OK",
+                    onlyConfirm:true
+                });
+			}
+		}
+		start();
+    </script>
+</body>
+</html>
