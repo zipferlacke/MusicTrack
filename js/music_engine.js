@@ -1,8 +1,9 @@
 import { MusicSheet } from "./music_sheet.js";
 import { MicAnalyser } from "./music_mic_analyser.js";
 import { MusicDB } from "./music_db.js";
-import { showBanner } from "/wuefl-libs/js/banner.js";
-import { userDialog } from "/wuefl-libs/js/userDialog.js";
+import { showBanner } from "/wuefl-libs/banner/banner.js";
+import { userDialog } from "/wuefl-libs/userDialog/userDialog.js";
+import { SelectPicker } from "/wuefl-libs/selectpicker/selectpicker.min.js"
 import { midiInstumentTable } from "./music_metadata_extender.js";
 import { Soundfont } from 'https://cdn.jsdelivr.net/npm/smplr@0.16.3/+esm'
 
@@ -177,7 +178,12 @@ export class MusicEngine{
 		// this.sheetData.htmlElm.sheetVisibleInstuments.addEventListener("change", this.#handleSelectVisible.bind(this));
 		// this.sheetData.htmlElm.sheetAnalyseInstuments.addEventListener("change", this.#handleSelectAnalyse.bind(this));
 		this.sheetData.htmlElm.sheetNotes.addEventListener("click", this.#noteTab.bind(this));
-		this.sheetData.htmlElm.sheetEdit.addEventListener("click", ()=>{this.options.edit = !this.options.edit; this.sheetData.htmlElm.sheetEdit.dataset.edit=this.options.edit});
+		this.sheetData.htmlElm.sheetEdit.addEventListener("click", ()=>{
+            this.options.edit = !this.options.edit;
+
+            showBanner(this.options.edit?"Modus: Bearbeiten":"Modus: normal", "info", 2000);
+            this.sheetData.htmlElm.sheetEdit.dataset.edit=this.options.edit;
+        });
     }
 
     /**

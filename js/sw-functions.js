@@ -1,4 +1,4 @@
-import {userDialog} from "/wuefl-libs/js/userDialog.js";
+import {userDialog} from "/wuefl-libs/userDialog/userDialog.js";
 import updateData from './update.json' with { type: 'json' };
 
 /**
