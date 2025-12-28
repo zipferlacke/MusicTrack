@@ -8,6 +8,15 @@
 
     "changelog":[
         {
+            "version":"1.0.2",
+            "changes":[
+                "1. Die UI-Farbe wurde zu einem kräftigeren Blau geändert.",
+                "2. Die Ladebildschirme wurden angepasst.",
+                "3. An ausgewählten Stellen werden Pop-ups für eine bessere Verständlichkeit eingeblendet.",
+                "4. Update auf die neueste Version der UI-Bibliothek. Dadurch haben sich einige Dialogfenster etwas verändert."
+            ]
+        },
+        {
             "version":"1.0.1",
             "changes":[
                 "1. Fix für Absturz beim Abspielen, wenn die Instrumente ein/ausgeblendet wurden.",

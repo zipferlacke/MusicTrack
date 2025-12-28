@@ -161,23 +161,6 @@ export class MusicEngine{
         });
         this.sheetData.htmlElm.sheetSettings.addEventListener("click", ()=>{this.settings()});
 
-		// this.sheetData.htmlElm.sheetVisibleInstuments.textContent = "";
-        // this.sheetData.htmlElm.sheetAnalyseInstuments.textContent = ""; 
-        // for (const instrument of this.sheetData.instruments ){
-		// 	const option = document.createElement('option');
-		// 	option.value = instrument.staffNumbers.toString();
-		// 	option.textContent = instrument.name;
-		// 	option.selected = instrument.visible?"selected": ""; 
-		// 	this.sheetData.htmlElm.sheetVisibleInstuments.appendChild(option);
-        //     if(instrument.visible){
-        //         const option2 = option.cloneNode(true);
-        //         option2.selected = instrument.analyse?"selected": "";
-        //         this.sheetData.htmlElm.sheetAnalyseInstuments.appendChild(option2);
-        //     }
-		// }
-
-		// this.sheetData.htmlElm.sheetVisibleInstuments.addEventListener("change", this.#handleSelectVisible.bind(this));
-		// this.sheetData.htmlElm.sheetAnalyseInstuments.addEventListener("change", this.#handleSelectAnalyse.bind(this));
 		this.sheetData.htmlElm.sheetNotes.addEventListener("click", this.#noteTab.bind(this));
 		this.sheetData.htmlElm.sheetEdit.addEventListener("click", ()=>{
             this.options.edit = !this.options.edit;
@@ -185,7 +168,6 @@ export class MusicEngine{
             showBanner(this.options.edit?"Modus: Bearbeiten":"Modus: normal", "info", 2000);
             this.sheetData.htmlElm.sheetEdit.dataset.edit=this.options.edit;
         });
-        document.body.setAttribute("data-loading", "");
     }
 
     /**
@@ -348,7 +330,6 @@ export class MusicEngine{
 
         const allActiveCompontents = this.musicData.activeRests.concat(Object.keys(this.musicData.activeNotesMap));
         this.#scrollToNote(allActiveCompontents[allActiveCompontents.length-1]);
-        console.log(allActiveCompontents, this.musicData.activeNotesMap, this.sheetData.staffInstrumentMap);
         this.musicSheet.highlightNotes(allActiveCompontents);
         
         this.options.playIndex ++;
@@ -756,7 +737,6 @@ export class MusicEngine{
         if(dialogContent.submit){
             
             const data = dialogContent.data;
-            console.log(data);
             this.sheetData.options.mode = data.mode;
             this.sheetData.options.skipRest = data.skipRest;
             this.sheetData.options.noteAnalyse = data.noteAnalyse;
