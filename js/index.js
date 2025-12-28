@@ -52,7 +52,7 @@ async function init(){
     document.querySelector(".addFiles").addEventListener("click", async ()=>{
         const validExtensions = ['mxl', 'musicxml', 'xml', 'mei'];
         const validMimeTypes = ["application/x-mei+xml","application/octet-stream","application/vnd.recordare.musicxml+xml","application/vnd.recordare.musicxml","text/xml"];
-        const formData = await userDialogUpload(validExtensions, validMimeTypes);
+        const formData = await userDialogUpload(validExtensions, validMimeTypes, true);
         if(!formData.files) return;
         await uploadFiles(formData, validExtensions);
         

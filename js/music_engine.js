@@ -96,6 +96,7 @@ export class MusicEngine{
 	}
 
 	async init(){
+        document.body.setAttribute("data-loading", "");
         this.sheetData.pageLoaded = true;
         this.audioCTX = new AudioContext();
 
@@ -184,6 +185,7 @@ export class MusicEngine{
             showBanner(this.options.edit?"Modus: Bearbeiten":"Modus: normal", "info", 2000);
             this.sheetData.htmlElm.sheetEdit.dataset.edit=this.options.edit;
         });
+        document.body.setAttribute("data-loading", "");
     }
 
     /**
