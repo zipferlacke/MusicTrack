@@ -1,5 +1,5 @@
 import {userDialog} from "/wuefl-libs/userDialog/userDialog.js";
-import updateData from './update.json' with { type: 'json' };
+import updateData from '../appdata/messages.json' with { type: 'json' };
 
 /**
  * 
