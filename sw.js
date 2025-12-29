@@ -1,5 +1,5 @@
-const APP_VERSION = 'v1.0.2';
-const illegal = "/sw.js"
+const APP_VERSION = 'v1.0.2 ';
+const networkFirst = ["/sw.js", "/appdata/messages.json", "/appdata/manifest.json"];
 
 // urlsToCache kann jetzt leer sein, da wir alles dynamisch cachen
 const urlsToCache = [
@@ -39,7 +39,6 @@ self.addEventListener('install', event => {
 
 // 2. Fetch-Event: Cache-First Strategie
 self.addEventListener('fetch', (event) => {
-    
     if (event.request.url.includes('/api/upload') && event.request.method === 'POST') {
         event.respondWith((async () => {
             const formData = await event.request.formData();
@@ -56,21 +55,20 @@ self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') {
         return;
     }
-    if (event.request.url.includes('/sw.js')) {
-        return;
-    }
 
+    const tryNetwork = networkFirst.some(path => event.request.url.includes(path));
     
 	event.respondWith((async () => {
         try {
             const cache = await caches.open(APP_VERSION);
             const cachedResponse = await cache.match(event.request);
-            if(cachedResponse) return cachedResponse;
+            
+            if(cachedResponse && !tryNetwork) return cachedResponse;
             
             const networkResponse = await fetch(event.request, { cache: 'no-cache' });
-            console.log(cachedResponse, networkResponse);
+
             if (networkResponse.ok) cache.put(event.request, networkResponse.clone());
-            return networkResponse;
+            return networkResponse?networkResponse:cachedResponse;
 
         } catch (error) {
             // Falls das Internet weg ist, geben wir eine Fehlermeldung
