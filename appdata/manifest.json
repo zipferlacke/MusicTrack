@@ -1,0 +1,129 @@
+{
+    "id": "/",
+    "name": "MusicTrack",
+    "short_name": "MusicTrack",
+    "start_url": "/musicTrack/",
+    "display": "standalone",
+    "display_override": [
+        "standalone",
+        "window-controls-overlay",
+        "fullscreen"
+    ],
+    "background_color": "#94cec6",
+    "theme_color": "#94cec6",
+    "description": "Lernapp für Instrument/Gesang",
+    "icons": [
+        {
+            "src": "../appdata/mTrack-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "../appdata/mTrack-144.png",
+            "sizes": "144x144",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "../appdata/mTrack-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "../appdata/mTrack-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "../appdata/mTrack-1024.png",
+            "sizes": "1024x1024",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "../appdata/screenshot-narrow-1.png",
+            "type": "image/png",
+            "sizes": "412x915",
+            "form_factor": "narrow"
+        },
+        {
+            "src": "../appdata/screenshot-narrow-2.png",
+            "type": "image/png",
+            "sizes": "412x915",
+            "form_factor": "narrow"
+        },
+        {
+            "src": "../appdata/screenshot-narrow-3.png",
+            "type": "image/png",
+            "sizes": "412x915",
+            "form_factor": "narrow"
+        },
+        {
+            "src": "../appdata/screenshot-narrow-4.png",
+            "type": "image/png",
+            "sizes": "412x915",
+            "form_factor": "narrow"
+        },
+        {
+            "src": "../appdata/screenshot-wide-1.png",
+            "type": "image/png",
+            "sizes": "1366x1024",
+            "form_factor": "wide"
+        },
+        {
+            "src": "../appdata/screenshot-wide-2.png",
+            "type": "image/png",
+            "sizes": "1366x1024",
+            "form_factor": "wide"
+        },
+        {
+            "src": "../appdata/screenshot-wide-3.png",
+            "type": "image/png",
+            "sizes": "1366x1024",
+            "form_factor": "wide"
+        },
+        {
+            "src": "../appdata/screenshot-wide-4.png",
+            "type": "image/png",
+            "sizes": "1366x1024",
+            "form_factor": "wide"
+        }
+    ],
+    "share_target": {
+        "action": "/musicTrack/api/upload",
+        "method": "POST",
+        "enctype": "multipart/form-data",
+        "params": {
+            "files": [
+                {
+                    "name": "media",
+                    "accept": [
+                        ".mxl", 
+                        ".musicxml", 
+                        ".mei", 
+                        ".xml",
+                        "application/x-mei+xml",
+                        "application/vnd.recordare.musicxml+xml",
+                        "application/vnd.recordare.musicxml",
+                        "text/xml",
+                        "application/xml",
+                        "application/octet-stream"
+                    ]
+                }
+            ]
+        }
+    },
+    "dir": "ltr",
+    "lang": "de",
+    "categories": [
+        "education",
+        "entertainment",
+        "lifestyle",
+        "music"
+    ]
+}

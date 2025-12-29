@@ -7,13 +7,13 @@
     <link rel="apple-touch-icon" href="./appdata/mTrack-512.png">
     <link rel="stylesheet" href="./css/controll.css">
     <link rel="stylesheet" href="./css/app.css">
-    <link rel="manifest" href="./js/manifest.json">
+    <link rel="manifest" href="./appdata/manifest.json">
     <script type="module" defer></script>
     <style class="no_analyse_css"></style>
     <style class="notes_validation_css"></style>
     <title>MusicTrack</title>
 </head>
-<body>
+<body class="loading">
     <header>
         <div>
             <a href="./index.html"><button class="button" data-shape="nobackground square"><span class="msr">arrow_back_ios_new</span></button></a>
@@ -44,9 +44,8 @@
     <div>
         <canvas class="scores" style="width: 100%;" width="9000" height="2000"></canvas>
     </div>
-    <script src="/wuefl-libs/js/selectpicker.min.js"></script>
     <script type="module" defer>;
-        import {userDialog} from "/wuefl-libs/js/userDialog.js";
+        import {userDialog} from "/wuefl-libs/userDialog/userDialog.js";
 		import {MusicEngine} from "./js/music_engine.js";
         import {MusicDB} from "./js/music_db.js";
         import {initialServiceWorker} from "./js/sw-functions.js"

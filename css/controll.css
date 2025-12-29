@@ -46,7 +46,7 @@
         --bg-input-hover: var(--clr-primary-400);
         --bg-input-selected: var(--clr-primary-600);
         --clr-input: var(--clr-neutral-800);
-        --clr-input-selected: var(--clr-neutral-300);
+        --clr-input-selected: var(--clr-neutral-400);
         --br-input: var(--br-default);
         --input-height: 2.25rem;
 
@@ -70,19 +70,25 @@
 
         --bg-input: var(--clr-primary-300);
         --bg-input-hover: var(--clr-primary-400);
-        --bg-input-selected: var(--clr-primary-600);
+        --bg-input-selected: var(--clr-primary-500);
         --clr-input: var(--clr-neutral-800);
-        --clr-input-selected: var(--clr-neutral-300);
+        --clr-input-selected: var(--clr-neutral-400);
         --br-input: var(--br-default);
         --input-height: 2.25rem;
         
-        --picker-bg: var(--bg-input);
-        --picker-bg-selected: var(--bg-input-selected);
-        --picker-bg-hover: var(--bg-input-hover);
-        --picker-clr: var(--clr-input);
-        --picker-clr-selected: var(--clr-input-selected);
-        --picker-br: var(--br-input);
-        --picker-fs: var(--fs-input:);
+        --bg-picker: var(--bg-default);
+        --bg-picker-trigger: var(--bg-input);
+        --clr-picker: var(--clr-input);
+        --fs-picker-header: 1rem;
+        --fs-input-picker: 0.9rem;
+        --br-picker: var(--br-default);
+        --height-input-picker:2rem;
+        --bg-input-picker: var(--bg-input);
+        --bg-hover-input-picker: var(--bg-input-hover);
+        --bg-option-picker: var(--bg-input);
+        --bg-hover-option-picker: var(--bg-input-hover);
+        --bg-selected-option-picker: var(--bg-input-selected);
+        --bg-selected-hover-option-picker: light-dark(hsl(from var(--bg-input-selected) h s calc(l + 5)), hsl(from var(--bg-input-selected) h s calc(l - 5)));
         
         --slideshow-ratio: none;
     }

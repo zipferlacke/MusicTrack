@@ -1,31 +1,5 @@
 @layer custom {
-    @keyframes pulseBG {
-      0%, 100% { opacity: 1;}
-      50% { opacity: 0.7; }
-    }
-    body {
-        &:after{
-          content: none;
-          display: none;
-        }
-
-        &[data-loading] {
-            overflow: hidden;
-        
-            &:after {
-              content: "";
-              position: fixed;
-              display: block; 
-              inset: 0;
-              background-color: hsl(from var(--clr-neutral-200) h s l / 0.8);
-              z-index: 100000;
-              
-              /* Pulsieren-Animation */
-              animation: pulseBG 1s infinite ease-in-out;
-              backdrop-filter: blur(1px); /* Schicker Milchglas-Effekt */
-            }
-        }
-        
+    body {    
         display: grid;
         grid-template-rows: 2;
         justify-items: center;

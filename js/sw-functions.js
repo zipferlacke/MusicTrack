@@ -1,5 +1,5 @@
-import {userDialog} from "/wuefl-libs/js/userDialog.js";
-import updateData from './update.json' with { type: 'json' };
+import {userDialog} from "/wuefl-libs/userDialog/userDialog.js";
+import updateData from '../appdata/messages.json' with { type: 'json'};
 
 /**
  * 
@@ -27,7 +27,7 @@ export async function initialServiceWorker({firstTime, currentVersion, autoupdat
                 title:"Installieren...",
                 content:`
                     <p>
-                        Sie könne diese Anwendung als WebApp (PWA) instalieren.<br>
+                        Sie können diese Anwendung als WebApp (PWA) installieren.<br>
                         <b>IOS</b><br>
                         1. Drücken sie auf das Teilen-Symbol <br>
                         2. Drücken sie auf zum Home Bildschirm hinzufügen (meist etwas versteckt, unter 'mehr' [<span class="msr" style="align-self:center;">more_horiz</span>]) 

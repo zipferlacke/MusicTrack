@@ -20,6 +20,10 @@
                 grid-template-columns: 1fr 8rem auto;
                 gap: 1rem;
                 align-items: center;
+                background-color: hsl(from var(--clr-primary-600) h s l / 0.2);
+                border-radius: var(--br-default);
+                border: 1px solid var(--clr-primary-600);
+                padding:0.5rem;
 
                 div {
                     display: grid;
@@ -28,7 +32,7 @@
 
                     progress {
                         width: 100%;
-                        background-color: red;
+                        background-color: var(--clr-neutral-100);
                     }
 
                     span {

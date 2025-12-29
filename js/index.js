@@ -1,6 +1,7 @@
-import {uploadMultiple} from "/wuefl-libs/js/upload_preview.js";
+import {userDialogUpload} from "/wuefl-libs/userDialog/userDialogUpload.js";
+import {userDialog} from "/wuefl-libs/userDialog/userDialog.js";
+
 import {MusicDB} from "./music_db.js";
-import {userDialog} from "/wuefl-libs/js/userDialog.js";
 import {MusicSheet} from "./music_sheet.js"
 import {FileHelper} from "./music_metadata_extender.js"
 import {initialServiceWorker} from "./sw-functions.js"
@@ -51,7 +52,7 @@ async function init(){
     document.querySelector(".addFiles").addEventListener("click", async ()=>{
         const validExtensions = ['mxl', 'musicxml', 'xml', 'mei'];
         const validMimeTypes = ["application/x-mei+xml","application/octet-stream","application/vnd.recordare.musicxml+xml","application/vnd.recordare.musicxml","text/xml"];
-        const formData = await uploadMultiple(validExtensions, validMimeTypes);
+        const formData = await userDialogUpload(validExtensions, validMimeTypes, true);
         if(!formData.files) return;
         await uploadFiles(formData, validExtensions);
         
