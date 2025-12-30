@@ -48,13 +48,13 @@ export class MicAnalyser {
      * @param {Options} [options={}]
      */
     constructor(audioContext, grapicsId, options={}) {
-        this.audioCXT = audioContext;
+        this.audioCTX = audioContext;
         this.options = {
             ...this.options,
             ...options 
         };
 
-        this.micAnalyser = this.audioCXT.createAnalyser();
+        this.micAnalyser = this.audioCTX.createAnalyser();
         this.micAnalyser.fftSize = this.options.fftSize;
         this.micAnalyser.smoothingTimeConstant = 0;
 
@@ -70,8 +70,11 @@ export class MicAnalyser {
      */
     async startListinig(){
         // Mikrophone Stream erstellt und fertig gemacht
+        if (this.audioCTX.state === 'suspended' || this.audioCTX.state === 'interrupted') {
+            await this.audioCTX.resume();
+        }
         this.rawStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        this.micSource = this.audioCXT.createMediaStreamSource(this.rawStream);
+        this.micSource = this.audioCTX.createMediaStreamSource(this.rawStream);
         
         // 2. Verbinde die Nodes (Processor ist bereits für onaudioprocess konfiguriert)
         this.micSource.connect(this.micAnalyser);
@@ -124,7 +127,7 @@ export class MicAnalyser {
             // Amplitude für Frequnz wird berechnet + die der Unsicherheit
             for(let i = -this.options.centVarianceAnalyse; i<this.options.centVarianceAnalyse+1; i+=this.options.centStepAnalyse){
                 const frequency = elm.frequency * Math.pow(2, i/1200);
-                let amplitude = this.#goertzel_padded(micRawData, this.audioCXT.sampleRate, frequency, this.audioCXT.sampleRate);
+                let amplitude = this.#goertzel_padded(micRawData, this.audioCTX.sampleRate, frequency, this.audioCTX.sampleRate);
                 if (amplitude < 1e-10) {
                     amplitude = -100;
                 } else {
@@ -159,7 +162,7 @@ export class MicAnalyser {
         const freq_stop = 1000;
             const bins = new Float32Array(freq_stop);
             for(let i=this.options.draw.startFrequency; i< this.options.draw.stopFrequency; i++){
-                const amplitude = this.#goertzel_padded(micRawData, this.audioCXT.sampleRate, i, this.audioCXT.sampleRate); 
+                const amplitude = this.#goertzel_padded(micRawData, this.audioCTX.sampleRate, i, this.audioCTX.sampleRate); 
                 if (amplitude < 1e-10) {
                     bins[i] = -100;
                 } else {
@@ -173,7 +176,7 @@ export class MicAnalyser {
         // this.micAnalyser.getFloatFrequencyData(fftData);
 
         // const fftData_plot = new Float32Array(freq_stop);
-        // const fftbinsize = Math.round(this.audioCXT.sampleRate/this.micAnalyser.fftSize);
+        // const fftbinsize = Math.round(this.audioCTX.sampleRate/this.micAnalyser.fftSize);
         // let fftbinstep = fftbinsize;
         // let fftbincount = 0;
         // for (let i = 0; i < freq_stop; i++) {
