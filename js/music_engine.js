@@ -5,14 +5,15 @@ import { showBanner } from "/wuefl-libs/banner/banner.js";
 import { userDialog } from "/wuefl-libs/userDialog/userDialog.js";
 import { SelectPicker } from "/wuefl-libs/selectpicker/selectpicker.min.js"
 import { midiInstumentTable } from "./music_metadata_extender.js";
-import { Soundfont } from 'https://cdn.jsdelivr.net/npm/smplr@0.16.3/+esm'
-
+import Soundfont from "./libs/soundfont-player.min.js"
+// import { AudioContext } from 'https://jspm.dev/standardized-audio-context';
+// import { Soundfont } from 'https://cdn.jsdelivr.net/npm/smplr@0.16.3/+esm'
 
 export class MusicEngine{
     /**
      * @type {{sound:Boolean, analyse:Boolean, state:"idle"|"running"|"paused", playIndex:number, edit:boolean, load:boolean}}
      */
-    options = {sound:false, analyse:true, state:"idle", playIndex:0, edit:false, load:true}
+    options = {sound:false, analyse:true, state:"idle", playIndex:0, edit:false, load:true, loadingScreen:[]}
     /**
      * @type {{
      *  htmlElm: {sheetNotes:HTMLElement, sheetScore:HTMLElement, sheetTitle:HTMLElement, sheetComposer:HTMLElement, sheetBPM:HTMLInputElement, sheetSettings:HTMLInputElement, micGraphElm:HTMLCanvasElement, sheetEdit:HTMLElement}, 
@@ -96,8 +97,7 @@ export class MusicEngine{
 	}
 
 	async init(){
-        document.body.setAttribute("data-loading", "");
-        this.sheetData.pageLoaded = true;
+        this.#showLoadingAnimation(true);
         this.audioCTX = new AudioContext();
 
         /**
@@ -105,6 +105,7 @@ export class MusicEngine{
          */
         this.micAnalyser = new MicAnalyser(this.audioCTX, this.sheetData.htmlElm.micGraphElm);
 
+        this.sheetData.pageLoaded = true;
         await this.db_helper.updateLastUsed()
 
 		const rawSheetMataData = await this.db_helper.getActiveSheetMetaData();
@@ -118,11 +119,20 @@ export class MusicEngine{
         this.sheetData.instruments = rawSheetMataData.instruments;
         this.sheetData.staffInstrumentMap = rawSheetMataData.staffInstrumentMap;
 		this.sheetData.htmlElm.sheetScore.innerHTML = `<progress max="1" value="${this.sheetData.score.value}"></progress><span>${(this.sheetData.score.value*100).toFixed(0)}/100</span>`;
+        
         for (const staffId of Object.keys(this.sheetData.staffInstrumentMap)){
             if(staffId == "internal") continue;
-            this.musicData.instrumentFontByStaff[staffId] = await new Soundfont(this.audioCTX, {instrument: midiInstumentTable[this.sheetData.staffInstrumentMap[staffId].midiNumber]}).load;
+            // this.musicData.instrumentFontByStaff[staffId] = await new Soundfont(this.audioCTX, {instrument: midiInstumentTable[this.sheetData.staffInstrumentMap[staffId].midiNumber], kit: "FluidR3_GM"}).load;
+            this.musicData.instrumentFontByStaff[staffId] = await new Soundfont.instrument(this.audioCTX, midiInstumentTable[this.sheetData.staffInstrumentMap[staffId].midiNumber], { 
+                format: 'mp3',
+                soundfont: 'MusyngKite' // Oder 'FluidR3_GM'
+            })
         }
-        
+        console.log(navigator.userAgent)
+        if (/iPad|iPhone|iPod|AppleWebKit/.test(navigator.userAgent)) {
+            showBanner("Na Apple Nutzer :/<br> Kein Ton? Die die rote Glocke im Kontrollzentrum deaktiviert?", "warning", 5000);
+        }
+
         if(sheet == null){
             userDialog({
                 type:"error",
@@ -137,7 +147,7 @@ export class MusicEngine{
         //Initial Zustand für Visible/Analyse Select wird gesetzt
         await this.setInstrumentVisibility(this.sheetData.instruments);
 
-		this.sheetData.htmlElm.sheetTitle.innerHTML = rawSheetMataData.title;
+        this.sheetData.htmlElm.sheetTitle.innerHTML = rawSheetMataData.title;
 		this.sheetData.htmlElm.sheetComposer.innerHTML = rawSheetMataData.composer;	
 
         this.sheetData.htmlElm.sheetBPM.value = this.sheetData.options.bpm;
@@ -162,12 +172,13 @@ export class MusicEngine{
         this.sheetData.htmlElm.sheetSettings.addEventListener("click", ()=>{this.settings()});
 
 		this.sheetData.htmlElm.sheetNotes.addEventListener("click", this.#noteTab.bind(this));
-		this.sheetData.htmlElm.sheetEdit.addEventListener("click", ()=>{
+		this.sheetData.htmlElm.sheetEdit.addEventListener("click", () => {
             this.options.edit = !this.options.edit;
 
-            showBanner(this.options.edit?"Modus: Bearbeiten":"Modus: normal", "info", 2000);
+            showBanner(this.options.edit?"Modus: Bearbeiten":"Modus: normal", "info", 3000);
             this.sheetData.htmlElm.sheetEdit.dataset.edit=this.options.edit;
         });
+        this.#showLoadingAnimation(false);
     }
 
     /**
@@ -199,10 +210,7 @@ export class MusicEngine{
      * Musik Stück wird gestartet
      */
     async start(){
-        if (this.audioCTX.state === 'suspended') {
-            this.audioCTX.resume();
-        }
-        document.body.setAttribute("data-loading", "");
+        this.#showLoadingAnimation(true);
         console.log("start");
         this.musicData.activeNotes = [];
         this.musicData.activeNotesMap = {};
@@ -218,7 +226,9 @@ export class MusicEngine{
         const notesAtTime = this.musicData.timestamps[this.options.playIndex];
 
         if(notesAtTime.on) this.#scrollToNote(notesAtTime.on[0].id);
-        document.body.removeAttribute("data-loading")
+        if(notesAtTime.restsOn) this.#scrollToNote(notesAtTime.restsOn[0].id);
+
+        this.#showLoadingAnimation(false);
         this.options.state = "running";
         let localBPM = 0;
         for (const instrument of this.sheetData.instruments){
@@ -227,17 +237,31 @@ export class MusicEngine{
             }
 
         }
-        const countdown = (number, midi, duration) =>{
+        const countdown = (number, midi, duration, staffNumber) =>{
             if(this.options.state != "running") return;
             if(number < 1) {
                 this.step();
                 return;
             };
-            this.playSound(1, midi, duration);
-            setTimeout(()=>countdown(number-1, midi, duration), duration);
+            this.playSound(staffNumber, midi, duration);
+            setTimeout(()=>countdown(number-1, midi, duration, staffNumber), duration);
         }
-        countdown(3, 70, 60000/localBPM);
         
+        for(let localIndex = this.options.playIndex; localIndex<this.musicData.timestamps.length; localIndex++){
+            const currentTimeStamp = this.musicData.timestamps[localIndex]; 
+            if(currentTimeStamp.on && currentTimeStamp.on.length != 0){
+                const id = currentTimeStamp.on[0]
+                const midi = this.musicSheet.getMIDIValuesForElementId(id);
+                const realStaff = this.sheetData.staffInstrumentMap.internal[midi.staff];
+                midi.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi;
+                
+                if(this.sheetData.staffInstrumentMap[realStaff].analyse){
+                    countdown(3, midi.pitch, 60000/localBPM, realStaff);
+                    break;
+                }
+                
+            }
+        }
     }
 
     /**
@@ -404,13 +428,22 @@ export class MusicEngine{
      * @param {number} pitch 
      * @param {number} pitchDuration - ms
      */
-    playSound(staff, pitch, pitchDuration){
-        this.musicData.instrumentFontByStaff[staff].start({
-            note: pitch, // Die MIDI Note Number
-            velocity: 100, // Die Anschlagstärke (0-127)
-            duration: pitchDuration/1000
+    async playSound(staff, pitch, pitchDuration) {
+        if (this.audioCTX.state === 'suspended' || this.audioCTX.state === 'interrupted') {
+            await this.audioCTX.resume();
+        }
+        this.musicData.instrumentFontByStaff[staff].play(pitch, this.audioCTX.currentTime, {
+            gain: 100 / 127,      // Velocity umrechnen (0 bis 1)
+            duration: pitchDuration / 1000
         });
     }
+    // playSound(staff, pitch, pitchDuration){
+    //     this.musicData.instrumentFontByStaff[staff].start({
+    //         note: pitch, // Die MIDI Note Number
+    //         velocity: 100, // Die Anschlagstärke (0-127)
+    //         duration: pitchDuration/1000
+    //     });
+    // }
 
     
     #scrollToNote(noteId) {
@@ -537,7 +570,7 @@ export class MusicEngine{
      * Setzt Musik Sichbarkeit 
      */
     async setInstrumentVisibility(){
-        document.body.setAttribute("data-loading", "DATA IS THERE");
+        this.#showLoadingAnimation(true);
         let hiddenInstruments = [];
         let cssSelectors = [];
         this.sheetData.staffInstrumentMap.internal = {};
@@ -616,7 +649,7 @@ export class MusicEngine{
         await this.musicSheet.loadMusic(serializer.serializeToString(xml), this.sheetData.options.bpm/this.sheetData.options.defaultBPM, false);
         await this.stop();
         this.#loadPayerData();
-        document.body.removeAttribute("data-loading");
+        this.#showLoadingAnimation(false);
     }
 
     async settings(){
@@ -752,5 +785,22 @@ export class MusicEngine{
             this.#changeVisibleAnalyse(data.analyse_instuments);
 
         };
+    }
+
+    /**
+     * Verwaltet den Ladebildschirm
+     * @param {boolean} loading 
+     */
+    #showLoadingAnimation(loading){
+        if(loading){
+            this.options.loadingScreen.push(1);
+            document.body.setAttribute("data-loading", "");
+        }else{
+            this.options.loadingScreen.pop();
+            if(this.options.loadingScreen.length == 0){
+                document.body.removeAttribute("data-loading");
+            }
+        }
+        
     }
 }

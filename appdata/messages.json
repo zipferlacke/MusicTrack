@@ -9,6 +9,14 @@
 
     "changelog":[
         {
+            "version":"1.0.4",
+            "changes":[
+                "1. Verbesserung der Kompatibilität mit älteren iOS/iPadOS-Versionen.",
+                "2. Hinweis-Benachrichtigung für Apple-Nutzer bei Tonproblemen.",
+                "3. Das Vorzählen wurde verbessert: Es wird jetzt der erste Ton des ersten Instruments genommen, das analysiert wird."
+            ]
+        },
+        {
             "version":"1.0.3",
             "changes":[
                 "1. Die UI-Farbe wurde zu einem kräftigeren Blau geändert.",

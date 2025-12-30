@@ -27,8 +27,9 @@ Oder die Android App [MusicTrack](https://play.google.com/store/apps/details?id=
 ## Technische Basis
 Dieses Projekt basiert auf folgenden leistungsstarken Bibliotheken:
 - [Verovio](https://www.verovio.org/): Für das High-End-Rendering der Musiknotation (MEI, MusicXML).
-- [Smplr](https://github.com/danigb/smplr): Für die authentische Sound-Wiedergabe der Instrumente.
+- [soundfont-player](https://github.com/danigb/soundfont-player/): Für die authentische Sound-Wiedergabe der Instrumente.
 - [IndexedDB (idb)](https://github.com/jakearchibald/idb): Für die effiziente lokale Speicherung von Noten und Fortschritten direkt im Browser.
+- [@progress/jszip-esm](https://github.com/telerik/jszip-esm/): Für das entpacken von .mxl Datein
 
 
 
