@@ -6,8 +6,33 @@ import { userDialog } from "/wuefl-libs/userDialog/userDialog.js";
 import { SelectPicker } from "/wuefl-libs/selectpicker/selectpicker.min.js"
 import { midiInstumentTable } from "./music_metadata_extender.js";
 import Soundfont from "./libs/soundfont-player.min.js"
+import {MusicDiagrams} from "./music_digramms.js";
 // import { AudioContext } from 'https://jspm.dev/standardized-audio-context';
 // import { Soundfont } from 'https://cdn.jsdelivr.net/npm/smplr@0.16.3/+esm'
+
+/**
+ * @typedef Note
+ * @property {string} id - Id der Grapischen Note 
+ * @property {number} frequency - Frequenz der Note 
+ * @property {number} duration - Dauer der Note 
+ * @property {number[]} score - Array mit den Score Daten
+ * @property {number[]} centDeviations - Array mit den Abweichungen
+ * @property {number} maxCountDeviations - Maximal mögliche Anzahl an abweiungen die eine Note haben kann
+ * @property {number} midi - Midiwert der Note
+ */
+
+/**
+ * @typedef Instrument
+ * @property {number} id - Id des Instruments
+ * @property {string} name - Name des Instruments
+ * @property {number} transSemi - Abweichung des Instruments
+ * @property {number} midiNumber - Midinumber  des Instruments
+ * @property {[number, number]} rhythm - Takt des Instruments
+ * @property {number[]} staffNumbers - Staffnumbers des Instruments
+ * @property {boolean} visible - Sichbarkiets des Instruments
+ * @property {boolean} analyse - Analyse des Instruments
+ */
+
 
 export class MusicEngine{
     /**
@@ -21,16 +46,13 @@ export class MusicEngine{
      *  score:{value:number, scoresSum:number, scoresAmount:number}, 
      *  finished:boolean, 
      *  sheetId:number,
-     *  sheetBpmDefault:number,
-     *  sheetBpmFactor:number,
-     *  validateNoteStepIntervall:number|null,
-     *  startRhythm: {denominator:number, numerator:number},
      *  options:{mode:"normal"|"learn", bpm:number, defaultBPM:number, firstOpen:boolean, skipRest:"auto"|"ask"|"never", noteAnalyse:"holding"|"declining", showNoteNames:number[]},
-     *  instruments: {id:number, name:string, transSemi:number, midiNumber:number, rhythm:[number, number] staffNumbers:number[], visible:boolean, analyse:boolean}[],
-     *  staffInstrumentMap: {<number>:{id:number, name:string, transSemi:number, midiNumber:number, rhythm:[number, number], staffNumbers:number[], visible:boolean, analyse:boolean}, internal:{<number>:number}},
+     *  instruments: Instrument[],
+     *  staffInstrumentMap: {<number>:Instrument, internal:{<number>:number}},
      *  noteAnnotations:{id:string, text:string}[],
      *  pageLoaded:boolean,
-     *  skipOptions:{{skipStart:skipEnd}};
+     *  intervallAnalyse: string|null,
+     *  skipOptions:{{skipStart:skipEnd}},
      * }}
      */
     sheetData = {
@@ -54,29 +76,27 @@ export class MusicEngine{
         score:{scoresSum:0, scoresAmount:0, value:0},
         finished:false, 
         sheetId:null,
-        sheetBpmDefault:null,
-        sheetBpmFactor:null,
-        validateNoteStepIntervall:null,
-        startRhythm: {denominator:4, numerator:4},
         options:{},
         instruments: [],
         noteAnnotations:[],
         staffInstrumentMap : {},
         pageLoaded: false,
         skipOptions: [],
+        intervallAnalyse:null
     };
 
     /**
      * @type {{
-     *  activeNotes:{id:string, frequency:number, duration:number, score:Number[], midi:Number},
-     *  activeNotesMap:Object<number,{id:string, frequency:number, duration:number, score:Number[], midi:Number}>,
+     *  activeNotes: Note[],
+     *  activeNotesMap:Object<number,Note>,
      *  timestamps: {on:string[]|null, off:string[]|null, tstamp:number}[],
      *  activeRests:string[],
      *  skipRests:Object<number, number>,
-     *  instrumentFontByStaff: Object<string, Soundfont>
+     *  instrumentFontByStaff: Object<string, Soundfont>,
+     *  noteDiagramMap: Object<string, SVGElement>
      * }}
      */
-    musicData = {activeNotes:[], activeNotesMap:{}, timestamps:[], activeRests:[], skipRests:[], instrumentFontByStaff:{}};
+    musicData = {activeNotes:[], activeNotesMap:{}, timestamps:[], activeRests:[], skipRests:[], instrumentFontByStaff:{}, noteDiagramMap:{}};
 
     /**
      * Eine MusicEngine wird erstellt.
@@ -104,6 +124,7 @@ export class MusicEngine{
          * @type {MicAnalyser}
          */
         this.micAnalyser = new MicAnalyser(this.audioCTX, this.sheetData.htmlElm.micGraphElm);
+        this.diagramHelper = new MusicDiagrams();
 
         this.sheetData.pageLoaded = true;
         await this.db_helper.updateLastUsed()
@@ -222,7 +243,19 @@ export class MusicEngine{
             this.sheetData.style.notesValidationCss.textContent = "";
         }
 
-        if(this.options.analyse) await this.micAnalyser.startListinig();
+        if(this.options.analyse) {
+            await this.micAnalyser.startListinig();
+            this.sheetData.intervallAnalyse = setInterval(
+                () => {
+                    this.micAnalyser.analyseMic(this.musicData.activeNotes);
+                    for (const noteObj of this.musicData.activeNotes){
+                        this.#validateNote(noteObj.id);
+                        this.diagramHelper.updateNoteDiagramm(noteObj.centDeviations, noteObj.maxCountDeviations, this.musicData.noteDiagramMap[noteObj.id])
+                    }
+                },  
+                this.micAnalyser.listinigQualityMs
+            ); 
+        }
         const notesAtTime = this.musicData.timestamps[this.options.playIndex];
 
         if(notesAtTime.on) this.#scrollToNote(notesAtTime.on[0].id);
@@ -337,6 +370,7 @@ export class MusicEngine{
                 midi.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi;
                 
                 if(this.sheetData.staffInstrumentMap[realStaff].analyse){
+                    note.maxCountDeviations = note.duration/this.options.listinigQualityMs
                     const note = {id:midi.id, midi:midi.pitch, frequency:this.#midiToFrequency(midi.pitch), duration:midi.duration, score:[]}
                     this.musicData.activeNotes.push(note);
                     this.musicData.activeNotesMap[note.id] = note;

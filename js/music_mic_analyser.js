@@ -4,12 +4,7 @@
  * @version 0.9
  */
 export class MicAnalyser {
-    /**
-     * Speichert die grade zu Analysierenden Frequnzen
-     * @type {{frequency:Number, score:Number[], duration:Number}[]}}
-     */
-    frequencyData = [];
-
+ 
     /**
      * @typedef {object} Options
      * @property {number} centVarianceTarget=5 Radius 
@@ -28,12 +23,14 @@ export class MicAnalyser {
     options = {
         centVarianceTarget:5, 
         centVarianceAnalyse:75,
-        centStepAnalyse: 2,
+        centVarianceTop:7.5,
+        centVarianceOk:12.5,
+        centStepAnalyse: 1,
         threshold_db: -80, 
         listinigQualityMs:25,
         fftSize:4096, 
         draw:{
-            drawFlag:true, 
+            drawFlag:false, 
             startFrequency:0, 
             stopFrequency:1500,
             freqAreaColor: "rgba(0 0 255 / 1)",
@@ -78,7 +75,6 @@ export class MicAnalyser {
         
         // 2. Verbinde die Nodes (Processor ist bereits für onaudioprocess konfiguriert)
         this.micSource.connect(this.micAnalyser);
-        this.intervallID = setInterval(this.#analyseMic.bind(this), this.options.listinigQualityMs); 
     }
 
     /**
@@ -100,17 +96,10 @@ export class MicAnalyser {
     }
 
     /**
-     * Setzt eine Liste von Frequnzen für die geprüft wird ob sie in der Audiospur liegen
-     * @param {{frequency:Number, score:Number[], duration:Number}[]} data 
-     */
-    setFrequencyData(data){
-        this.frequencyData = data;
-    }
-
-    /**
      * Microphone Daten werden analysiert
+     * @param {{frequency:number, score:number[], duration:number, maxCountDeviations:number, centDeviations:number[]}[]} noteData - Liste der Noten die Analysiert werden sollen
      */
-    #analyseMic(){
+    analyseMic(noteData){
         const micRawData = new Float32Array(this.micAnalyser.fftSize);
         this.micAnalyser.getFloatTimeDomainData(micRawData);
         this.#applyHanningWindow(micRawData);
@@ -121,12 +110,12 @@ export class MicAnalyser {
             this.canvasCtx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         }
 
-        this.frequencyData.forEach( elm => {
+        for(const note of noteData){
             let maxAmplitude = -100;
             let maxCent = 0;
             // Amplitude für Frequnz wird berechnet + die der Unsicherheit
             for(let i = -this.options.centVarianceAnalyse; i<this.options.centVarianceAnalyse+1; i+=this.options.centStepAnalyse){
-                const frequency = elm.frequency * Math.pow(2, i/1200);
+                const frequency = note.frequency * Math.pow(2, i/1200);
                 let amplitude = this.#goertzel_padded(micRawData, this.audioCTX.sampleRate, frequency, this.audioCTX.sampleRate);
                 if (amplitude < 1e-10) {
                     amplitude = -100;
@@ -138,23 +127,27 @@ export class MicAnalyser {
                     maxCent = i;
                 }
             }
-
             // Bewertung ob frequnz getroffen wurde wird erstellt
             if(maxAmplitude > this.options.threshold_db){
-                const centDeviation = Math.max(Math.abs(maxCent) - this.options.centVarianceTarget, 0);
-                elm.score.push(1 - centDeviation/this.options.centVarianceAnalyse);
+                const centDeviation = Math.abs(maxCent);
+                note.centDeviations.push(maxCent);   
+                note.score.push(1 - centDeviation/this.options.centVarianceAnalyse);
             }else{
-                elm.score.push(0);
+                note.centDeviations.push(null);
+                note.score.push(0);
             }
 
-            if(elm.score.length > elm.duration/this.options.listinigQualityMs) elm.score.shift()
+            if(note.score.length > note.maxCountDeviations ) {
+                note.score.shift();
+                note.centDeviations.shift();
+            }
 
             if(this.options.draw.drawFlag){
                 const freqfactor = Math.pow(2, this.options.centVarianceTarget/1200);
-                const freqBoundLow = elm.frequency / freqfactor;
-                const freqBoundUp = elm.frequency * freqfactor;
+                const freqBoundLow = note.frequency / freqfactor;
+                const freqBoundUp = note.frequency * freqfactor;
                 const freqVariance = freqBoundUp - freqBoundLow;
-                this.#drawFrequencyBox(elm.frequency, freqVariance, this.options.draw.freqAreaColor);
+                this.#drawFrequencyBox(note.frequency, freqVariance, this.options.draw.freqAreaColor);
             }
         });
 
