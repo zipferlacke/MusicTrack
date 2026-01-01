@@ -84,16 +84,31 @@
                     scrollbar-width: none;
                 }
                 g.playing {
-                    fill: blue!important;
+                    fill: green;
+                    filter:drop-shadow(0 0 5px var(--clr-primary-600));
+                    box-shadow: 0px 0px 0 red!important;
                 };
-                g.note.green {fill:green;}
-                g.note.yellow {fill:yellow;}
-                g.note.red {fill:red;}
+                g.note { fill: var(--note-color, var(--text-clr)); }
+
                 g.notehead{
                     use {
                         color:transparent;
                         stroke-width: 340px; 
                     }
+                }
+            }
+            #legend{
+                list-style:none;
+                li{
+                    display:flex;
+                    gap:1rem;
+                    span:first-child{
+                        height: 1rem;
+                        width: 1rem;
+                    }
+                    [data-color="green"]{background-color: green;}
+                    [data-color="yellow"]{background-color: yellow;}
+                    [data-color="red"]{background-color: red;}
                 }
             }
         }

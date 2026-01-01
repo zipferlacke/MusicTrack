@@ -1,17 +1,16 @@
 /**
- * Mikrophon Analyser
- * @author Xy
- * @version 0.9
+ * Mikrophon Analysierer
+ * @author Florian Wüllner
+ * @version 1.0
  */
 export class MicAnalyser {
  
     /**
      * @typedef {object} Options
-     * @property {number} centVarianceTarget=5 Radius 
-     * @property {number} centVarianceAnalyse=75 Radius
-     * @property {number} centStepAnalyse=2 Radius
-     * @property {number} threshold_db=-80 
-     * @property {number} listinigQualityMs
+     * @property {number} centVarianceAnalyse Anaylse spektrum in Cent (75 Radius)
+     * @property {number} centStepAnalyse Genauigkiet der Analyse in Cent (1)
+     * @property {number} threshold_db Minimale Lautstärke in db für ein Ton (-80) 
+     * @property {number} listinigQualityMs Wie häufig die Audiospur ausgewerte werden soll (25ms)
      * @property {number} fftSize=4096
      * @property {{drawFlag:boolean, startFrequency:Number, stopFrequency:Number, freqAreaColor:String, freqColor:String}} draw
      * 
@@ -21,10 +20,7 @@ export class MicAnalyser {
      * @type {Options}
      */
     options = {
-        centVarianceTarget:5, 
         centVarianceAnalyse:75,
-        centVarianceTop:7.5,
-        centVarianceOk:12.5,
         centStepAnalyse: 1,
         threshold_db: -80, 
         listinigQualityMs:25,
@@ -149,7 +145,7 @@ export class MicAnalyser {
                 const freqVariance = freqBoundUp - freqBoundLow;
                 this.#drawFrequencyBox(note.frequency, freqVariance, this.options.draw.freqAreaColor);
             }
-        });
+        }
 
         if(this.options.draw.drawFlag){
         const freq_stop = 1000;

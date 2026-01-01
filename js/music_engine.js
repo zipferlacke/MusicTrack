@@ -7,48 +7,28 @@ import { SelectPicker } from "/wuefl-libs/selectpicker/selectpicker.min.js"
 import { midiInstumentTable } from "./music_metadata_extender.js";
 import Soundfont from "./libs/soundfont-player.min.js"
 import {MusicDiagrams} from "./music_digramms.js";
+import * as Types from "./types.js";
 // import { AudioContext } from 'https://jspm.dev/standardized-audio-context';
 // import { Soundfont } from 'https://cdn.jsdelivr.net/npm/smplr@0.16.3/+esm'
 
-/**
- * @typedef Note
- * @property {string} id - Id der Grapischen Note 
- * @property {number} frequency - Frequenz der Note 
- * @property {number} duration - Dauer der Note 
- * @property {number[]} score - Array mit den Score Daten
- * @property {number[]} centDeviations - Array mit den Abweichungen
- * @property {number} maxCountDeviations - Maximal mögliche Anzahl an abweiungen die eine Note haben kann
- * @property {number} midi - Midiwert der Note
- */
 
-/**
- * @typedef Instrument
- * @property {number} id - Id des Instruments
- * @property {string} name - Name des Instruments
- * @property {number} transSemi - Abweichung des Instruments
- * @property {number} midiNumber - Midinumber  des Instruments
- * @property {[number, number]} rhythm - Takt des Instruments
- * @property {number[]} staffNumbers - Staffnumbers des Instruments
- * @property {boolean} visible - Sichbarkiets des Instruments
- * @property {boolean} analyse - Analyse des Instruments
- */
 
 
 export class MusicEngine{
     /**
-     * @type {{sound:Boolean, analyse:Boolean, state:"idle"|"running"|"paused", playIndex:number, edit:boolean, load:boolean}}
+     * @type {{sound:Boolean, analyse:Boolean, state:"idle"|"running"|"paused", playIndex:number, edit:boolean, load:boolean, listinigQualityMs:number, centOptions:{analyseRadius:number,yellowRadius:number, greenRadius:number}}}
      */
-    options = {sound:false, analyse:true, state:"idle", playIndex:0, edit:false, load:true, loadingScreen:[]}
+    options = {sound:false, analyse:true, state:"idle", playIndex:0, edit:false, load:true, loadingScreen:[], centOptions:{analyseRadius:75, yellowRadius:25, greenRadius:10}, listinigQualityMs:25}
     /**
      * @type {{
-     *  htmlElm: {sheetNotes:HTMLElement, sheetScore:HTMLElement, sheetTitle:HTMLElement, sheetComposer:HTMLElement, sheetBPM:HTMLInputElement, sheetSettings:HTMLInputElement, micGraphElm:HTMLCanvasElement, sheetEdit:HTMLElement}, 
+     *  htmlElm: {sheetNotes:HTMLElement, sheetScore:HTMLElement, sheetTitle:HTMLElement, sheetComposer:HTMLElement, sheetBPM:HTMLInputElement, sheetSettings:HTMLInputElement, micGraphElm:HTMLCanvasElement, sheetEdit:HTMLElement, noteDiagrams:HTMLElement, legend:HTMLElement}, 
      *  style: {noAnalyseCSS:HTMLElement, notesValidationCss: HTMLElement},
      *  score:{value:number, scoresSum:number, scoresAmount:number}, 
      *  finished:boolean, 
      *  sheetId:number,
-     *  options:{mode:"normal"|"learn", bpm:number, defaultBPM:number, firstOpen:boolean, skipRest:"auto"|"ask"|"never", noteAnalyse:"holding"|"declining", showNoteNames:number[]},
-     *  instruments: Instrument[],
-     *  staffInstrumentMap: {<number>:Instrument, internal:{<number>:number}},
+     *  options:{mode:"normal"|"learn", bpm:number, defaultBPM:number, firstOpen:boolean, skipRest:"auto"|"ask"|"never", noteAnalyse:"holding"|"declining", showNoteNames:number[], drawNoteDiagrams:boolean},
+     *  instruments: Types.Instrument[],
+     *  staffInstrumentMap: {<number>:Types.Instrument, internal:{<number>:number}},
      *  noteAnnotations:{id:string, text:string}[],
      *  pageLoaded:boolean,
      *  intervallAnalyse: string|null,
@@ -66,17 +46,18 @@ export class MusicEngine{
             sheetBPM:document.querySelector("#sheet_bpm"),
             sheetSettings:document.querySelector("#sheet_settings"),
             sheetEdit:document.querySelector("#sheet_edit"),
-            micGraphElm:null
+            micGraphElm:null,
+            noteDiagrams:document.querySelector("#noteDiagrams"),
+            legend:document.querySelector("#legend"),
         },
         style:{
             noAnalyseCSS:document.querySelector(".no_analyse_css"),
             notesValidationCss:document.querySelector(".notes_validation_css"),
-            
         }, 
         score:{scoresSum:0, scoresAmount:0, value:0},
         finished:false, 
         sheetId:null,
-        options:{},
+        options:{mode:"normal", bpm:120, defaultBPM:120, firstOpen:true, skipRest:"auto", noteAnalyse:"declining", showNoteNames:[], drawNoteDiagrams:true},
         instruments: [],
         noteAnnotations:[],
         staffInstrumentMap : {},
@@ -87,8 +68,8 @@ export class MusicEngine{
 
     /**
      * @type {{
-     *  activeNotes: Note[],
-     *  activeNotesMap:Object<number,Note>,
+     *  activeNotes: Types.Note[],
+     *  activeNotesMap:Object<number,Types.Note>,
      *  timestamps: {on:string[]|null, off:string[]|null, tstamp:number}[],
      *  activeRests:string[],
      *  skipRests:Object<number, number>,
@@ -120,10 +101,7 @@ export class MusicEngine{
         this.#showLoadingAnimation(true);
         this.audioCTX = new AudioContext();
 
-        /**
-         * @type {MicAnalyser}
-         */
-        this.micAnalyser = new MicAnalyser(this.audioCTX, this.sheetData.htmlElm.micGraphElm);
+        this.micAnalyser = new MicAnalyser(this.audioCTX, this.sheetData.htmlElm.micGraphElm, {listinigQualityMs:this.options.listinigQualityMs, centVarianceAnalyse:this.options.centOptions.analyseRadius});
         this.diagramHelper = new MusicDiagrams();
 
         this.sheetData.pageLoaded = true;
@@ -135,12 +113,12 @@ export class MusicEngine{
 
 		this.sheetData.sheetId = rawSheetMataData.id;
 		this.sheetData.score.value = rawSheetMataData.score;
-		this.sheetData.options = rawSheetMataData.options;
+		this.sheetData.options = {...this.sheetData.options, ...rawSheetMataData.options}
+
 		this.sheetData.noteAnnotations = rawSheetMataData.noteAnnotations;
         this.sheetData.instruments = rawSheetMataData.instruments;
         this.sheetData.staffInstrumentMap = rawSheetMataData.staffInstrumentMap;
 		this.sheetData.htmlElm.sheetScore.innerHTML = `<progress max="1" value="${this.sheetData.score.value}"></progress><span>${(this.sheetData.score.value*100).toFixed(0)}/100</span>`;
-        
         for (const staffId of Object.keys(this.sheetData.staffInstrumentMap)){
             if(staffId == "internal") continue;
             // this.musicData.instrumentFontByStaff[staffId] = await new Soundfont(this.audioCTX, {instrument: midiInstumentTable[this.sheetData.staffInstrumentMap[staffId].midiNumber], kit: "FluidR3_GM"}).load;
@@ -153,6 +131,13 @@ export class MusicEngine{
         if (/iPad|iPhone|iPod|AppleWebKit/.test(navigator.userAgent)) {
             showBanner("Na Apple Nutzer :/<br> Kein Ton? Die die rote Glocke im Kontrollzentrum deaktiviert?", "warning", 5000);
         }
+
+        this.sheetData.htmlElm.legend.innerHTML = `
+            Farblegende (100 cent ist der Abstand zwischen Halbtönen)
+            <li><span data-color="green"></span><span>bis ${this.options.centOptions.greenRadius} cent Abweichung</span></li>
+            <li><span data-color="yellow"></span><span>bis ${this.options.centOptions.yellowRadius} cent Abweichung</span></li>
+            <li><span data-color="red"></span><span>bis ${this.options.centOptions.analyseRadius} cent Abweichung</span></li>
+        `
 
         if(sheet == null){
             userDialog({
@@ -169,7 +154,7 @@ export class MusicEngine{
         await this.setInstrumentVisibility(this.sheetData.instruments);
 
         this.sheetData.htmlElm.sheetTitle.innerHTML = rawSheetMataData.title;
-		this.sheetData.htmlElm.sheetComposer.innerHTML = rawSheetMataData.composer;	
+		this.sheetData.htmlElm.sheetComposer.innerHTML = rawSheetMataData.composer;
 
         this.sheetData.htmlElm.sheetBPM.value = this.sheetData.options.bpm;
 		this.sheetData.htmlElm.sheetBPM.max = this.sheetData.options.defaultBPM*4;
@@ -240,20 +225,23 @@ export class MusicEngine{
         this.sheetData.htmlElm.sheetNotes.dataset.playing = true;
         if(this.options.state == "idle"){
             this.musicData.timestamps = this.musicSheet.renderPlay();
+            [...this.sheetData.htmlElm.sheetNotes.querySelectorAll(`.note`)].map(noteElm => noteElm?.style.removeProperty('--note-color'));
             this.sheetData.style.notesValidationCss.textContent = "";
+            this.sheetData.htmlElm.noteDiagrams.innerHTML = "";
         }
-
+        let lastTime = Date.now()
         if(this.options.analyse) {
             await this.micAnalyser.startListinig();
             this.sheetData.intervallAnalyse = setInterval(
                 () => {
                     this.micAnalyser.analyseMic(this.musicData.activeNotes);
+                    lastTime = Date.now();
                     for (const noteObj of this.musicData.activeNotes){
                         this.#validateNote(noteObj.id);
                         this.diagramHelper.updateNoteDiagramm(noteObj.centDeviations, noteObj.maxCountDeviations, this.musicData.noteDiagramMap[noteObj.id])
                     }
                 },  
-                this.micAnalyser.listinigQualityMs
+                this.options.listinigQualityMs
             ); 
         }
         const notesAtTime = this.musicData.timestamps[this.options.playIndex];
@@ -304,6 +292,7 @@ export class MusicEngine{
         if(this.options.state == "running"){
             this.options.state = "paused";
             await this.micAnalyser.stopListinig();
+            clearInterval(this.sheetData.intervallAnalyse);
             console.log("Wiedergabe pausiert");
         }
     }
@@ -312,13 +301,13 @@ export class MusicEngine{
         this.options.playIndex=0;
         this.options.state = "idle"
         if(this.options.analyse) await this.micAnalyser.stopListinig();
+        clearInterval(this.sheetData.intervallAnalyse);
         this.musicData.timestamps = this.musicSheet.renderOverview();
         this.sheetData.htmlElm.sheetNotes.dataset.playing = false
     }
 
     async step(){
         if(this.options.state != "running") return;
-        this.micAnalyser.setFrequencyData(this.options.analyse ? this.musicData.activeNotes : []);
         
         const skipToTime = this.musicData.skipRests[this.musicData.timestamps[this.options.playIndex].tstamp] 
         if(skipToTime){
@@ -358,6 +347,7 @@ export class MusicEngine{
                             break;
                         }
                     }
+                    this.musicData.noteDiagramMap[midi.id].remove();
                 }
                 delete this.musicData.activeNotesMap[midi.id];
             }
@@ -370,10 +360,14 @@ export class MusicEngine{
                 midi.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi;
                 
                 if(this.sheetData.staffInstrumentMap[realStaff].analyse){
-                    note.maxCountDeviations = note.duration/this.options.listinigQualityMs
-                    const note = {id:midi.id, midi:midi.pitch, frequency:this.#midiToFrequency(midi.pitch), duration:midi.duration, score:[]}
+                    /** 
+                     * @type {Types.Note}
+                     */
+                    const note = {id:midi.id, midi:midi.pitch, frequency:this.#midiToFrequency(midi.pitch), duration:midi.duration, score:[], centDeviations:[], maxCountDeviations:Math.floor(midi.duration/this.options.listinigQualityMs)}
                     this.musicData.activeNotes.push(note);
                     this.musicData.activeNotesMap[note.id] = note;
+                    this.musicData.noteDiagramMap[note.id] = this.diagramHelper.createNoteDiagramm({id:note.id, centVarianceAnalyse:this.options.centOptions.analyseRadius, centVarianceOk:this.options.centOptions.yellowRadius, centVarianceTop:this.options.centOptions.greenRadius})
+                    if(this.sheetData.options.drawNoteDiagrams) this.sheetData.htmlElm.noteDiagrams.insertAdjacentElement("beforeend", this.musicData.noteDiagramMap[note.id]);
                 }
 
                 if(this.options.sound){
@@ -394,6 +388,9 @@ export class MusicEngine{
         if(this.options.playIndex < this.musicData.timestamps.length){
             setTimeout(()=>this.step(), this.musicData.timestamps[this.options.playIndex].tstamp - currentTimeStamp.tstamp);
         }else{
+            this.sheetData.score.value = this.sheetData.score.scoresSum / this.sheetData.score.scoresAmount;
+            this.sheetData.htmlElm.sheetScore.innerHTML = `<progress max="1" value="${this.sheetData.score.value}"></progress><span>${(this.sheetData.score.value*100).toFixed(0)}/100</span>`;
+            this.db_helper.setSheetScore(this.sheetData.sheetId, this.sheetData.score.value);
             this.stop();
         } 
     }
@@ -548,17 +545,15 @@ export class MusicEngine{
 
                 // Logik zum Färben und Prüfen (unverändert, außer Intervall-Logik)
                 flagAllpassed = true;
-                if (score > 0.90) {
-                    this.sheetData.style.notesValidationCss.textContent += `[id="${note.id}"]{fill:green}`;
-
-
-                } else if (score > 0.80) {
-                    this.sheetData.style.notesValidationCss.textContent += `[id="${note.id}"]{fill:yellow}`;
-
+                const noteElm = document.querySelector(`[id="${note.id}"]`);
+                if (score > 1-(this.options.centOptions.greenRadius/this.options.centOptions.analyseRadius)) {
+                    noteElm?.style.setProperty('--note-color', 'green');
+                } else if (score > 1-(this.options.centOptions.yellowRadius/this.options.centOptions.analyseRadius)) {
+                    noteElm?.style.setProperty('--note-color', 'yellow');
                 } else {
                     flagAllpassed = false;
                     if (this.sheetData.options.mode !== "learn") {
-                        this.sheetData.style.notesValidationCss.textContent += `[id="${note.id}"]{fill:red}`;
+                        noteElm?.style.setProperty('--note-color', 'red');
                     }
                 }
 
@@ -709,6 +704,10 @@ export class MusicEngine{
                 `).join(" ")}
                 </select>
             </label>
+            <lable>
+                <h3>Noten Diagramme anzeigen</h3>
+                <input type="checkbox" name="drawNoteDiagrams" data-shape="toggle" ${this.sheetData.options.drawNoteDiagrams?"checked":""}>
+            </lable>
             <label for="sheet_mode">
                 <h3 class="heading-3">Spielmodus</h3>
                 <select id="sheet_mode" name="mode"><option value="normal">Normal</option><option value="learn">Lernen</option></select>
@@ -802,12 +801,14 @@ export class MusicEngine{
 
         
         if(dialogContent.submit){
-            
             const data = dialogContent.data;
+            console.log(data);
+
             this.sheetData.options.mode = data.mode;
             this.sheetData.options.skipRest = data.skipRest;
             this.sheetData.options.noteAnalyse = data.noteAnalyse;
             this.sheetData.options.showNoteNames = data.showNoteNames? data.showNoteNames.map(Number):[];
+            this.sheetData.options.drawNoteDiagrams = data.drawNoteDiagrams;
             await this.db_helper.setSheetOptions(this.sheetData.sheetId, this.sheetData.options);
 
             for(const transSemi of data.transSemi){

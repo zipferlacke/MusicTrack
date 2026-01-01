@@ -94,7 +94,7 @@ async function showSheetData(){
     const sheetData = await db_helper.getAllSheetMetadata();
     sheetData.sort((a,b)=>{return a.lastUsed > b.lastUsed? -1:1});
     for(const elm of sheetData){
-        sheetElm.insertAdjacentHTML("beforeend", `  
+        sheetElm.insertAdjacentHTML("beforeend", `
             <div class="file" data-id="${elm.id}">
                 <a href="app.html">
                     <button class="button file-active" data-shape="no-background">
