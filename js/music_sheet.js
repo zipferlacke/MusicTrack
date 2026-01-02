@@ -73,6 +73,18 @@ export class MusicSheet{
         const timestampData = this.verovioToolkit.renderToTimemap({includeRests:true});
         this.#sheetData.htmlElemts.sheetElm.innerHTML = data;
         console.log("Musikstück gerendert");
+        
+        for(const elm of this.#sheetData.htmlElemts.sheetElm.querySelectorAll(".rest")){
+            const bbox = elm.getBBox();
+            const rect = `<rect class="bg_note" x="${bbox.x}" y="${bbox.y}" height="${bbox.height}" width="${bbox.width}"></rect>`
+            elm.insertAdjacentHTML("afterbegin", rect)
+        }
+        for(const elm of this.#sheetData.htmlElemts.sheetElm.querySelectorAll(".note")){
+            const bbox = elm.querySelector(".notehead").getBBox();
+            const height = bbox.height*3;
+            const rect = `<rect class="bg_note" x="${bbox.x-25}" y="${bbox.y-height/2+bbox.height/2}" height="${height}" width="${bbox.width+50}"></rect>`
+            elm.insertAdjacentHTML("afterbegin", rect)
+        }
         return timestampData;
     }
 

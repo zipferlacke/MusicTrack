@@ -16,7 +16,7 @@ import * as Types from "./types.js";
 
 export class MusicEngine{
     /**
-     * @type {{sound:Boolean, analyse:Boolean, state:"idle"|"running"|"paused", playIndex:number, edit:boolean, load:boolean, listinigQualityMs:number, centOptions:{analyseRadius:number,yellowRadius:number, greenRadius:number}}}
+     * @type {{sound:Boolean, analyse:Boolean, state:"idle"|"running"|"paused"|"waiting", playIndex:number, edit:boolean, load:boolean, listinigQualityMs:number, centOptions:{analyseRadius:number,yellowRadius:number, greenRadius:number}}}
      */
     options = {sound:false, analyse:true, state:"idle", playIndex:0, edit:false, load:true, loadingScreen:[], centOptions:{analyseRadius:75, yellowRadius:25, greenRadius:10}, listinigQualityMs:25}
     /**
@@ -237,8 +237,19 @@ export class MusicEngine{
                     this.micAnalyser.analyseMic(this.musicData.activeNotes);
                     lastTime = Date.now();
                     for (const noteObj of this.musicData.activeNotes){
-                        this.#validateNote(noteObj.id);
-                        this.diagramHelper.updateNoteDiagramm(noteObj.centDeviations, noteObj.maxCountDeviations, this.musicData.noteDiagramMap[noteObj.id])
+                        this.#validateNote(noteObj.id, false);
+                        this.diagramHelper.updateNoteDiagramm(noteObj.centDeviations, noteObj.maxCountDeviations, this.musicData.noteDiagramMap[noteObj.id]);
+                         if (this.sheetData.options.mode == "learn"){
+                            if((noteObj.score[noteObj.score.length-1] || 0) < 0.1){
+                                noteObj.startTime = lastTime;
+                            }
+
+                            if(this.options.state == "waiting"){
+                                this.options.state = "running"
+                                console.log("restart active");
+                                setTimeout(()=> {this.step(false)}, (noteObj.startTime+noteObj.duration)-Date.now());
+                            }
+                         }
                     }
                 },  
                 this.options.listinigQualityMs
@@ -268,19 +279,21 @@ export class MusicEngine{
             setTimeout(()=>countdown(number-1, midi, duration, staffNumber), duration);
         }
         
+        loopStartCountdown:
         for(let localIndex = this.options.playIndex; localIndex<this.musicData.timestamps.length; localIndex++){
             const currentTimeStamp = this.musicData.timestamps[localIndex]; 
             if(currentTimeStamp.on && currentTimeStamp.on.length != 0){
-                const id = currentTimeStamp.on[0]
-                const midi = this.musicSheet.getMIDIValuesForElementId(id);
-                const realStaff = this.sheetData.staffInstrumentMap.internal[midi.staff];
-                midi.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi;
-                
-                if(this.sheetData.staffInstrumentMap[realStaff].analyse){
-                    countdown(3, midi.pitch, 60000/localBPM, realStaff);
-                    break;
+                for(let noteIndex = 0; noteIndex<currentTimeStamp.on.length; noteIndex++){
+                    const id = currentTimeStamp.on[noteIndex];
+                    const midi = this.musicSheet.getMIDIValuesForElementId(id);
+                    const realStaff = this.sheetData.staffInstrumentMap.internal[midi.staff];
+                    midi.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi;
+                    
+                    if(this.sheetData.staffInstrumentMap[realStaff].analyse){
+                        countdown(3, midi.pitch, 60000/localBPM, realStaff);
+                        break loopStartCountdown;
+                    }
                 }
-                
             }
         }
     }
@@ -306,7 +319,7 @@ export class MusicEngine{
         this.sheetData.htmlElm.sheetNotes.dataset.playing = false
     }
 
-    async step(){
+    async step(first=true){
         if(this.options.state != "running") return;
         
         const skipToTime = this.musicData.skipRests[this.musicData.timestamps[this.options.playIndex].tstamp] 
@@ -337,19 +350,46 @@ export class MusicEngine{
         }
 
         if(offEvents){
-            for(const id of offEvents){
-                const midi = this.musicSheet.getMIDIValuesForElementId(id);
-                if(this.musicData.activeNotesMap[midi.id]){
-                    await this.#validateNote(midi.id);
-                    for(let i=0; i< this.musicData.activeNotes.length; i++){
-                        if(this.musicData.activeNotes[i].id == midi.id){
-                            this.musicData.activeNotes.splice(i, 1);
-                            break;
-                        }
+            if(this.sheetData.options.mode == "learn"){
+                let allNotesPassed = true;
+                for(const id of offEvents){
+                    if(this.musicData.activeNotesMap[id]){
+                        if(!this.#validateNote(id, first) && this.sheetData.options.mode == "learn"){
+                            document.querySelector(`[id="${id}"]`)?.setAttribute("wait", "");
+                            allNotesPassed = false;
+                        } 
                     }
-                    this.musicData.noteDiagramMap[midi.id].remove();
                 }
-                delete this.musicData.activeNotesMap[midi.id];
+                if(!allNotesPassed){
+                    this.options.state = "waiting";
+                    return
+                }
+                for(const id of offEvents){
+                    if(this.musicData.activeNotesMap[id]){
+                        for(let i=0; i< this.musicData.activeNotes.length; i++){
+                            if(this.musicData.activeNotes[i].id == id){
+                                this.musicData.activeNotes.splice(i, 1);
+                                break;
+                            }
+                        }
+                        this.musicData.noteDiagramMap[id].remove();
+                    }
+                    delete this.musicData.activeNotesMap[id];
+                }
+            }else{
+                for(const id of offEvents){
+                    if(this.musicData.activeNotesMap[id]){
+                        this.#validateNote(id, first)
+                        for(let i=0; i< this.musicData.activeNotes.length; i++){
+                            if(this.musicData.activeNotes[i].id ==id){
+                                this.musicData.activeNotes.splice(i, 1);
+                                break;
+                            }
+                        }
+                        this.musicData.noteDiagramMap[id].remove();
+                    }
+                    delete this.musicData.activeNotesMap[id];
+                }
             }
         }
 
@@ -503,92 +543,46 @@ export class MusicEngine{
     /**
      * Überprüft gespielte Note
      * @param {string} id
-     * @param {boolean} [first] 
-     * @returns {Promise<void>} Eine Promise, die aufgelöst wird, wenn der nächste Schritt möglich ist.
+     * @param {boolean} [isFinalCheck] Wenn true wird der Score in die finale Statistik gepackt.
+     * @returns {boolean} Wert ob akzeptabel war.
      */
-    async #validateNote(id, first = true) {
-        // Die Funktion gibt sofort eine Promise zurück
-        return new Promise((resolve) => {
-            if (this.options.state !== "running") {
-                // Bei nicht laufendem Zustand sofort auflösen/abbrechen
-                console.warn("Not running")
-                return resolve();
-            }
+    #validateNote(id, isFinalCheck = false) {
+        const note = this.musicData.activeNotesMap[id];
+        if (!note) {
+            // Bei nicht laufendem Zustand sofort auflösen/abbrechen
+            console.warn("No note")
+        }
 
-            const note = this.musicData.activeNotesMap[id];
+        let score;
+        if(this.sheetData.options.noteAnalyse == "declining"){
+            score = note.score.length === 0 
+            ? 0 
+            : note.score.reduce((res, curr, i) => res + (curr * (note.score.length - i)), 0) / ((note.score.length * (note.score.length + 1)) / 2);
+        }else{
+            score = note.score.length === 0 ? 0:note.score.reduce((res, curr) => res + curr)/note.score.length;
+        }
 
-            if (!note) {
-                // Note nicht gefunden, sofort auflösen
-                console.warn("Note nicht gefunden")
-                return resolve();
-            }
+        // Logik zum Färben und Prüfen (unverändert, außer Intervall-Logik)
+        let flagAllpassed = true;
+        let color ="";
+        const noteElm = document.querySelector(`[id="${note.id}"]`);
+        if (score > 1-(this.options.centOptions.greenRadius/this.options.centOptions.analyseRadius)) {
+            color = 'green';
+        } else if (score > 1-(this.options.centOptions.yellowRadius/this.options.centOptions.analyseRadius)) {
+            color = 'yellow';
+        } else {
+            flagAllpassed = false;
+            color = 'red';
+        }
 
-            // Deklaration außerhalb der Schleife, damit sie im Intervall zugänglich ist
-            let intervalId = null;
-            let flagAllpassed = true; // Setze initial auf true
+        noteElm?.style.setProperty('--note-color', color);
+        if (isFinalCheck) {
+            this.sheetData.score.scoresSum += score;
+            this.sheetData.score.scoresAmount += 1;
+            this.sheetData.style.notesValidationCss.textContent += `[id="${note.id}"]{--note-color:${color}}`
+        }
 
-            const checkAndResolve = (isInitialCheck) => {
-                // Logik zur Score-Berechnung (unverändert)
-                let score;
-                if(this.sheetData.options.noteAnalyse == "declining"){
-                    score = note.score.length === 0 
-                    ? 0 
-                    : note.score.reduce((res, curr, i) => res + (curr * (note.score.length - i)), 0) / ((note.score.length * (note.score.length + 1)) / 2);
-                }else{
-                    score = note.score.length === 0 ? 0:note.score.reduce((res, curr) => res + curr)/note.score.length;
-                }
-
-                if (isInitialCheck) {
-                    this.sheetData.score.scoresSum += score;
-                    this.sheetData.score.scoresAmount += 1;
-                }
-
-                // Logik zum Färben und Prüfen (unverändert, außer Intervall-Logik)
-                flagAllpassed = true;
-                const noteElm = document.querySelector(`[id="${note.id}"]`);
-                if (score > 1-(this.options.centOptions.greenRadius/this.options.centOptions.analyseRadius)) {
-                    noteElm?.style.setProperty('--note-color', 'green');
-                } else if (score > 1-(this.options.centOptions.yellowRadius/this.options.centOptions.analyseRadius)) {
-                    noteElm?.style.setProperty('--note-color', 'yellow');
-                } else {
-                    flagAllpassed = false;
-                    if (this.sheetData.options.mode !== "learn") {
-                        noteElm?.style.setProperty('--note-color', 'red');
-                    }
-                }
-
-                // --- Kern der Promise-Logik ---
-
-                if (this.sheetData.options.mode === "learn" && !flagAllpassed) {
-                    // Im Lernmodus und nicht bestanden:
-                    // 1. MIDI pausieren (nur beim ersten Aufruf)
-                    
-                    // 2. Intervall starten (oder weiterlaufen lassen)
-                    if (intervalId === null) {
-                        intervalId = setInterval(() => {
-                            // Wiederhole die Prüfung im Intervall, bis resolved
-                            checkAndResolve(false);
-                        }, 50);
-                    }
-                    
-                    // Promise bleibt offen (kein resolve)
-                } else {
-                    // Lernmodus ODER Bestanden (flagAllpassed ist true)
-                    
-                    // 1. Intervall stoppen, falls aktiv
-                    if (intervalId) {
-                        clearInterval(intervalId);
-                        intervalId = null;
-                    }
-
-                    // 3. Promise auflösen, damit der nächste await-Schritt fortfahren kann
-                    resolve();
-                }
-            };
-
-            // Start der Prüfung
-            checkAndResolve(first);
-        });
+        return flagAllpassed;
     }
 
     toogleVolume(){

@@ -79,17 +79,20 @@
             }
             .notes{
                 height: max-content;
+                rect.bg_note{fill:transparent; stroke:none!important;}
                 &[data-playing="true"]{ 
                     overflow-x:auto;
                     scrollbar-width: none;
                 }
                 g.playing {
-                    fill: green;
-                    filter:drop-shadow(0 0 5px var(--clr-primary-600));
-                    box-shadow: 0px 0px 0 red!important;
+                    rect.bg_note{fill:var(--clr-info-500);}
                 };
+                g.playing[wait] {
+                    rect.bg_note{fill:var(--clr-warning-500);}
+                };
+                
                 g.note { fill: var(--note-color, var(--text-clr)); }
-
+                
                 g.notehead{
                     use {
                         color:transparent;
