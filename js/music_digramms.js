@@ -4,7 +4,7 @@ export class MusicDiagrams{
      * @param {{id:string, centVarianceAnalyse:number, centVarianceOk:number, centVarianceTop:number, width:number}} param0 
      * @returns {SVGElement} 
      */
-    createNoteDiagramm({id, centVarianceAnalyse=75, centVarianceOk=12.5, centVarianceTop=7.5, width=500}){
+    createNoteDiagram({id, centVarianceAnalyse=75, centVarianceOk=12.5, centVarianceTop=7.5, width=500}){
         const height = centVarianceAnalyse*2;
         const variance = centVarianceAnalyse;
         const parser = new DOMParser();
@@ -28,7 +28,7 @@ export class MusicDiagrams{
      * @param {number} max 
      * @param {SVGElement} svg 
      */
-    updateNoteDiagramm(score, divergations, maxPoints, svg){
+    updateNoteDiagram(score, divergations, maxPoints, svg){
         const stepWidth = parseInt(svg.getAttribute("width"))/maxPoints;
         const dataLayer = svg.querySelector(`#data_layer`);
         svg.querySelector(`#score_text`).textContent =  (score*100).toFixed(0) + "%";

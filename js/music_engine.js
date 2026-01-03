@@ -57,7 +57,7 @@ export class MusicEngine{
         score:{scoresSum:0, scoresAmount:0, value:0},
         finished:false, 
         sheetId:null,
-        options:{mode:"normal", bpm:120, defaultBPM:120, firstOpen:true, skipRest:"auto", noteAnalyse:"declining", showNoteNames:[], showNoteDiagramsOnAnalyse:true, showNoteDiagramOnTab:true, showReview:false},
+        options:{mode:"normal", bpm:120, defaultBPM:120, firstOpen:true, skipRest:"auto", noteAnalyse:"declining", showNoteNames:[], showNoteDiagramsOnAnalyse:false, showNoteDiagramOnTab:false, showReview:true},
         instruments: [],
         noteAnnotations:[],
         staffInstrumentMap : {},
@@ -409,7 +409,7 @@ export class MusicEngine{
                     const note = {id:midi.id, midi:midi.pitch, frequency:this.#midiToFrequency(midi.pitch), duration:midi.duration, score:[], centDeviations:[], maxCountDeviations:Math.floor(midi.duration/this.options.listinigQualityMs)}
                     this.musicData.activeNotes.push(note);
                     this.musicData.activeNotesMap[note.id] = note;
-                    this.musicData.noteDiagramMap[note.id] = this.diagramHelper.createNoteDiagramm({id:note.id, centVarianceAnalyse:this.options.centOptions.analyseRadius, centVarianceOk:this.options.centOptions.yellowRadius, centVarianceTop:this.options.centOptions.greenRadius})
+                    this.musicData.noteDiagramMap[note.id] = this.diagramHelper.createNoteDiagram({id:note.id, centVarianceAnalyse:this.options.centOptions.analyseRadius, centVarianceOk:this.options.centOptions.yellowRadius, centVarianceTop:this.options.centOptions.greenRadius})
                     if(this.sheetData.options.showNoteDiagramsOnAnalyse) this.sheetData.htmlElm.noteDiagrams.insertAdjacentElement("beforeend", this.musicData.noteDiagramMap[note.id]);
                 }
 
@@ -496,7 +496,7 @@ export class MusicEngine{
                     const note = {id:midiValue.id, midi:midiValue.pitch, frequency:this.#midiToFrequency(midiValue.pitch), duration:midiValue.duration, score:[], centDeviations:[], maxCountDeviations:Math.floor(midiValue.duration/this.options.listinigQualityMs)}
                     this.musicData.activeNotes.push(note);
                     this.musicData.activeNotesMap[note.id] = note;
-                    this.musicData.noteDiagramMap[note.id] = this.diagramHelper.createNoteDiagramm({id:note.id, centVarianceAnalyse:this.options.centOptions.analyseRadius, centVarianceOk:this.options.centOptions.yellowRadius, centVarianceTop:this.options.centOptions.greenRadius})
+                    this.musicData.noteDiagramMap[note.id] = this.diagramHelper.createNoteDiagram({id:note.id, centVarianceAnalyse:this.options.centOptions.analyseRadius, centVarianceOk:this.options.centOptions.yellowRadius, centVarianceTop:this.options.centOptions.greenRadius})
                     this.sheetData.htmlElm.noteDiagrams.insertAdjacentElement("beforeend", this.musicData.noteDiagramMap[note.id]);
                     
                     await this.micAnalyser.startListinig();
@@ -504,11 +504,11 @@ export class MusicEngine{
                         ()=>{this.#processActiveNotes()},
                         this.options.listinigQualityMs
                     );
-                    dialog("Noten-Live-Diagramm", ()=>{clearInterval(this.sheetData.intervallAnalyse); this.musicData.activeNotes = []; this.musicData.activeNotesMap = {}});        
+                    dialog("Ton-Live-Diagramm", ()=>{clearInterval(this.sheetData.intervallAnalyse); this.musicData.activeNotes = []; this.musicData.activeNotesMap = {}});        
                 }
             }else if(this.options.state == "review"){
                 if(this.musicData.noteDiagramMap[midiValue.id])
-                    dialog("Noten-Diagramm", ()=>{});
+                    dialog("Ton-Diagramm", ()=>{});
 
             }else if(this.options.state == "edit"){
                 const item = this.sheetData.noteAnnotations.find(e => e.id === note.id);
@@ -554,7 +554,7 @@ export class MusicEngine{
         this.micAnalyser.analyseMic(this.musicData.activeNotes);
         for (const noteObj of this.musicData.activeNotes){
             const {valid, score} = this.#validateNote(noteObj.id, false);
-            this.diagramHelper.updateNoteDiagramm(score, noteObj.centDeviations, noteObj.maxCountDeviations, this.musicData.noteDiagramMap[noteObj.id]);
+            this.diagramHelper.updateNoteDiagram(score, noteObj.centDeviations, noteObj.maxCountDeviations, this.musicData.noteDiagramMap[noteObj.id]);
             if (this.sheetData.options.mode == "learn"){
                 const now = Date.now();
                 if((noteObj.score[noteObj.score.length-1] || 0) < 0.1){
@@ -740,65 +740,66 @@ export class MusicEngine{
     async settings(){
         const instruments = this.sheetData.instruments; 
         const html = `
-            <label for="visible_instuments">
-                <h3 class="heading-3">Instrumente Sichtbarkeit</h3>
-                <select id="visible_instuments" multiple name="visible_instuments" data-defaults='${JSON.stringify(instruments.map(instrument => instrument.id))}'>
-                ${instruments.map(instrument => `
-                    <option value="${instrument.id}" ${instrument.visible?"selected": ""}>
-                        ${instrument.name}
+            <div class="settings_group">
+                <h2 class="heading-2">Instrumente</h2>
+                <label for="visible_instuments">
+                    <h3 class="heading-3">Sichtbar</h3>
+                    <select id="visible_instuments" multiple name="visible_instuments" data-defaults='${JSON.stringify(instruments.map(instrument => instrument.id))}'>
+                    ${instruments.map(instrument => `
+                        <option value="${instrument.id}" ${instrument.visible?"selected": ""}>
+                            ${instrument.name}
+                        </option>
+                    `).join(" ")}
+                    </select>
+                </label>
+                <label for="analyse_instuments">
+                    <h3 class="heading-3">Üben</h3>
+                    <select id="analyse_instuments" multiple name="analyse_instuments">
+                    ${instruments.map(instrument => `
+                        <option value="${instrument.id}" ${instrument.analyse?"selected": ""}>
+                            ${instrument.name}
                     </option>
-                `).join(" ")}
-                </select>
-            </label>
-            <label for="analyse_instuments">
-                <h3 class="heading-3">Instrumente Analysieren</h3>
-                <select id="analyse_instuments" multiple name="analyse_instuments">
-                ${instruments.map(instrument => `
-                    <option value="${instrument.id}" ${instrument.analyse?"selected": ""}>
-                        ${instrument.name}
-                </option>
-                `).join(" ")}
-                </select>
-            </label>
-            <div style="display:flex; flex-wrap:warp; gap:1rem">
+                    `).join(" ")}
+                    </select>
+                </label>
+            </div>
+            <div class="settings_group">
+                <h2 class="heading-2">Ton-Diagramme</h2>
                 <lable>
-                    <h3>Noten-Diagramme bei Analyse</h3>
+                    <h3>Beim Üben</h3>
                     <input type="checkbox" name="showNoteDiagramsOnAnalyse" data-shape="toggle" ${this.sheetData.options.showNoteDiagramsOnAnalyse?"checked":""}>
                 </lable>
                 <lable>
-                    <h3>Noten Diagram bei klick</h3>
+                    <h3>Bei Klick auf Note</h3>
                     <input type="checkbox" name="showNoteDiagramOnTab" data-shape="toggle" ${this.sheetData.options.showNoteDiagramOnTab?"checked":""}>
                 </lable>
-                <lable>
-                    <h3>Feedback anzeigen</h3>
-                    <input type="checkbox" name="showReview" data-shape="toggle" ${this.sheetData.options.showReview?"checked":""}>
-                </lable>
             </div>
+            <lable>
+                <h3>Feedback anzeigen</h3>
+                <input type="checkbox" name="showReview" data-shape="toggle" ${this.sheetData.options.showReview?"checked":""}>
+            </lable>
             <label for="sheet_mode">
                 <h3 class="heading-3">Spielmodus</h3>
                 <select id="sheet_mode" name="mode"><option value="normal">Normal</option><option value="learn">Lernen</option></select>
             </label>
-            <label for="sheet_noteanalyse_method">
-                <h3 class="heading-3">Tonerkennung</h3>
-                <select id="sheet_noteanalyse_method" name="noteAnalyse"><option value="holding">Ton halten</option><option value="declining">Ton abfallend</option></select>
-            </label>
-            <label for="sheet_skipRest_method">
-                <h3 class="heading-3">Pausen überspringen</h3>
-                <select id="sheet_skipRest_method" name="skipRest"><option value="auto">automatisch</option><option value="ask">bestätigen</option><option value="never">nie</option></select>
-            </label>
-            <label for="sheet_showNoteNames_method">
-                <h3 class="heading-3">Notennamen anzeigen nach Instrumment</h3>
-                <select id="sheet_showNoteNames_method" name="showNoteNames" multiple>
-                    ${instruments.map(instrument => `
-                    <option value="${instrument.id}" ${this.sheetData.options.showNoteNames.includes(instrument.id)?"selected": ""}>
-                        ${instrument.name}
-                    </option>
-                `).join(" ")}
-                </select>
-            </label>
-            <details class="details">
-                <summary>Instrumente Transponieren</summary>
+            <div class="settings_group">
+                <h2 class="heading-2">Weiteres</h2>
+                <label for="sheet_skipRest_method">
+                    <h3 class="heading-3">Pausen überspringen</h3>
+                    <select id="sheet_skipRest_method" name="skipRest"><option value="auto">automatisch</option><option value="ask">bestätigen</option><option value="never">nie</option></select>
+                </label>
+                <label for="sheet_showNoteNames_method">
+                    <h3 class="heading-3">Notennamen</h3>
+                    <select id="sheet_showNoteNames_method" name="showNoteNames" multiple>
+                        ${instruments.map(instrument => `
+                        <option value="${instrument.id}" ${this.sheetData.options.showNoteNames.includes(instrument.id)?"selected": ""}>
+                            ${instrument.name}
+                        </option>
+                    `).join(" ")}
+                    </select>
+                </label>
                 <div>
+                    <h3 class="heading-3">Instrumente Transponieren</h3>
                     ${instruments.map(instrument => `
                         <label>
                             <h4 class="heading-4">${instrument.name}</h4>
@@ -808,7 +809,11 @@ export class MusicEngine{
 
                     `).join(" ")}
                 </div>
-            </details>
+                <label for="sheet_noteanalyse_method">
+                    <h3 class="heading-3">Toncharakteristik</h3>
+                    <select id="sheet_noteanalyse_method" name="noteAnalyse"><option value="holding">gleichmäßig</option><option value="declining">abfallend</option></select>
+                </label>
+            </div>
         `;
         const onInsertFunc = () =>{
             document.querySelector('#sheet_mode').value = this.sheetData.options.mode;
