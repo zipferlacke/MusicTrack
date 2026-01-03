@@ -28,9 +28,15 @@
 
             &[data-state="review"]{
                 .controll{display: none;}
-                .review{display: flex;}
+                .review{display: grid;}
             }
-            .review{display: none;}
+            .review{
+                display: none;
+                grid-template-columns: 1fr auto;
+                h1{justify-self:center;display:flex; align-items:center;  gap:0.5rem; font-size:var(--fs-700)}
+                
+                
+            }
             .controll {
                 display: flex;
                 flex-wrap: wrap;
@@ -41,6 +47,15 @@
                 div, label{
                     display: flex;
                     width: min-content;
+                }
+                
+                #playstack{
+                    & > *{display:none}
+                    &[data-active="play"] .playstart{display:flex}
+                    &[data-active="pause"] .playpause{display:flex}
+                    &[data-active="3"] .play3 {display:flex}
+                    &[data-active="2"] .play2 {display:flex}
+                    &[data-active="1"] .play1 {display:flex}
                 }
 
                 &:has([data-state="edit"]){
@@ -55,19 +70,6 @@
                     height: var(--input-height);
                 }
 
-                .stack {
-                    &[data-active="play"] {
-                        .playstart {
-                            display: none;
-                        }
-                    }
-
-                    &[data-active="pause"] {
-                        .playpause {
-                            display: none;
-                        }
-                    }
-                }
 
                 .playVolume {
                     &[data-active="mute"] {
@@ -106,6 +108,7 @@
                     }
                 }
             }
+            
             #legend{
                 list-style:none;
                 li{
@@ -121,8 +124,27 @@
                 }
             }
         }
-    }
+        
 
+        #noteDetailInfo{
+            width:fit-content;
+            display: grid;
+            gap: 1rem;
+            justify-content:center;
+            header{
+                display: flex;
+                justify-content:space-between;
+                padding:0em;
+            }
+        }
+    }
+    .noteDiagram{
+        border-radius: var(--br-default);
+        --noteDiagram_line: black;
+        --noteDiagram_red:var(--clr-danger-400);
+        --noteDiagram_yellow: var(--clr-warning-500);
+        --noteDiagram_green: var(--clr-success-300);
+    }
     dialog{
         detail{
             summary{background-color: var(bg-input);}

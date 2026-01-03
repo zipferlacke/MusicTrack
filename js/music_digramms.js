@@ -10,12 +10,12 @@ export class MusicDiagrams{
         const parser = new DOMParser();
 
         const svgHTML = `
-        <svg id="noteDiagram_${id}" viewBox="0 ${-variance} ${width} ${height}" width="${width}" height="200px" preserveAspectRatio="none">
-            <rect x="0" y="${-variance}" width="${width}" height="${height}" fill="#ff4444" />
-            <rect x="0" y="-${centVarianceOk}" width="${width}" height="${centVarianceOk*2}" fill="#ffbb33" />
-            <rect x="0" y="-${centVarianceTop}" width="${width}" height="${centVarianceTop*2}" fill="#00c851" />
-            <line x1="0" y1="0" x2="${width}" y2="0" stroke="white" stroke-dasharray="2" stroke-width="1" opacity="0.5" />
-            
+        <svg class="noteDiagram" id="noteDiagram_${id}" viewBox="0 ${-variance} ${width} ${height}" width="${width}" height="200px" preserveAspectRatio="none">
+            <rect x="0" y="${-variance}" width="${width}" height="${height}" fill="var(--noteDiagram_red)" />
+            <rect x="0" y="-${centVarianceOk}" width="${width}" height="${centVarianceOk*2}" fill="var(--noteDiagram_yellow)" />
+            <rect x="0" y="-${centVarianceTop}" width="${width}" height="${centVarianceTop*2}" fill="var(--noteDiagram_green)" />
+            <line x1="0" y1="0" x2="${width}" y2="0" stroke="var(--noteDiagram_line)" stroke-dasharray="2" stroke-width="1" opacity="0.5" />
+            <text id="score_text" x="${width - 10}" y="${-variance + 20}" text-anchor="end" fill="white" pointer-events: none;">0%</text>
             <g id="data_layer"></g>
         </svg>`;
         return document.createRange().createContextualFragment(svgHTML).firstElementChild;
@@ -28,9 +28,10 @@ export class MusicDiagrams{
      * @param {number} max 
      * @param {SVGElement} svg 
      */
-    updateNoteDiagramm(divergations, maxPoints, svg){
+    updateNoteDiagramm(score, divergations, maxPoints, svg){
         const stepWidth = parseInt(svg.getAttribute("width"))/maxPoints;
         const dataLayer = svg.querySelector(`#data_layer`);
+        svg.querySelector(`#score_text`).textContent =  (score*100).toFixed(0) + "%";
         dataLayer.innerHTML = "";
 
         let lastX = null;
@@ -41,9 +42,9 @@ export class MusicDiagrams{
         for (let i=0; i<divergations.length; i++){
             const y =  divergations[i] != null? -divergations[i]:null;
             const x = i * stepWidth;
-            if(y != null) elements += `<circle cx="${x}" cy="${y}" r="1" fill="black" />`;
+            if(y != null) elements += `<circle cx="${x}" cy="${y}" r="1" fill="var(--noteDiagram_line)" />`;
             if(y!= null && lastY != null){
-                elements += `<line x1="${lastX}" y1="${lastY}" x2="${x}" y2="${y}" stroke="black" stroke-width="1" stroke-linecap="round" />`;
+                elements += `<line x1="${lastX}" y1="${lastY}" x2="${x}" y2="${y}" stroke="var(--noteDiagram_line)" stroke-width="1" stroke-linecap="round" />`;
             }
             lastX = x;
             lastY = y;

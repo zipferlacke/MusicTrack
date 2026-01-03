@@ -21,7 +21,7 @@ export class MusicEngine{
     options = {sound:false, analyse:true, state:"idle", playIndex:0, edit:false, load:true, loadingScreen:[], centOptions:{analyseRadius:75, yellowRadius:25, greenRadius:10}, listinigQualityMs:25}
     /**
      * @type {{
-     *  htmlElm: {appContent:HTMLElement, sheetNotes:HTMLElement, sheetScore:HTMLElement, sheetTitle:HTMLElement, sheetComposer:HTMLElement, sheetBPM:HTMLInputElement, sheetSettings:HTMLInputElement, micGraphElm:HTMLCanvasElement, sheetEdit:HTMLElement, noteDiagrams:HTMLElement, legend:HTMLElement, sheetCloseReview:HTMLElement}, 
+     *  htmlElm: {appContent:HTMLElement, sheetNotes:HTMLElement, sheetScore:HTMLElement, sheetTitle:HTMLElement, sheetComposer:HTMLElement, sheetBPM:HTMLInputElement, sheetSettings:HTMLInputElement, micGraphElm:HTMLCanvasElement, sheetEdit:HTMLElement, noteDiagrams:HTMLElement, legend:HTMLElement, sheetCloseReview:HTMLElement, sheetPlayStack:HTMLElement}, 
      *  style: {noAnalyseCSS:HTMLElement, notesValidationCss: HTMLElement},
      *  score:{value:number, scoresSum:number, scoresAmount:number}, 
      *  finished:boolean, 
@@ -41,16 +41,14 @@ export class MusicEngine{
             sheetScore:document.querySelector(".sheet_score"),
             sheetTitle:document.querySelector(".sheet_title"),
             sheetComposer:document.querySelector(".sheet_composer"),
-            // sheetVisibleInstuments:document.querySelector("#visible_instuments"),
-            // sheetAnalyseInstuments:document.querySelector("#analyse_instuments"),
-            // sheetMode:document.querySelector("#sheet_mode"),
             sheetBPM:document.querySelector("#sheet_bpm"),
             sheetSettings:document.querySelector("#sheet_settings"),
             sheetEdit:document.querySelector("#sheet_edit"),
             micGraphElm:null,
             noteDiagrams:document.querySelector("#noteDiagrams"),
             legend:document.querySelector("#legend"),
-            sheetCloseReview: document.querySelector("#sheet_close_review")
+            sheetCloseReview: document.querySelector("#sheet_close_review"),
+            sheetPlayStack: document.querySelector("#playstack")
         },
         style:{
             noAnalyseCSS:document.querySelector(".no_analyse_css"),
@@ -59,7 +57,7 @@ export class MusicEngine{
         score:{scoresSum:0, scoresAmount:0, value:0},
         finished:false, 
         sheetId:null,
-        options:{mode:"normal", bpm:120, defaultBPM:120, firstOpen:true, skipRest:"auto", noteAnalyse:"declining", showNoteNames:[], showNoteDiagramsOnAnalyse:true, showNoteDiagramOnTab:true, skipReview:false},
+        options:{mode:"normal", bpm:120, defaultBPM:120, firstOpen:true, skipRest:"auto", noteAnalyse:"declining", showNoteNames:[], showNoteDiagramsOnAnalyse:true, showNoteDiagramOnTab:true, showReview:false},
         instruments: [],
         noteAnnotations:[],
         staffInstrumentMap : {},
@@ -261,14 +259,17 @@ export class MusicEngine{
             if(instrument.analyse){
                 localBPM = this.sheetData.options.bpm * (instrument.rhythm[1]/4) 
             }
-
         }
-        const countdown = (number, midi, duration, staffNumber) =>{
+
+        const countdown = (number, midi, duration, staffNumber) => {
+            this.sheetData.htmlElm.sheetPlayStack.dataset.active = number;
             if(this.options.state != "running") return;
             if(number < 1) {
+                this.sheetData.htmlElm.sheetPlayStack.dataset.active = "pause";
                 this.step();
                 return;
             };
+
             this.playSound(staffNumber, midi, duration);
             setTimeout(()=>countdown(number-1, midi, duration, staffNumber), duration);
         }
@@ -299,6 +300,7 @@ export class MusicEngine{
         if(this.options.state == "running"){
             this.options.state = "paused"; 
             this.sheetData.htmlElm.appContent.dataset.state = "paused";
+            this.sheetData.htmlElm.sheetPlayStack.dataset.active = "play";
             await this.micAnalyser.stopListinig();
             clearInterval(this.sheetData.intervallAnalyse);
             console.log("Wiedergabe pausiert");
@@ -307,12 +309,13 @@ export class MusicEngine{
 
     async stop(){
         this.options.playIndex=0;
+        this.sheetData.htmlElm.sheetPlayStack.dataset.active = "play";
 
         if(["running", "waiting"].includes(this.options.state)){
             this.options.state = "review";
             this.sheetData.htmlElm.appContent.dataset.state = "review";
             this.sheetData.htmlElm.noteDiagrams.innerHTML = "";
-            if(this.sheetData.options.skipReview){
+            if(!this.sheetData.options.showReview){
                 this.#closeReview()
             }
         }
@@ -366,7 +369,7 @@ export class MusicEngine{
             if(this.sheetData.options.mode == "learn"){
                 let allNotesPassed = true;
                 for(const id of offEvents){
-                    if(this.musicData.activeNotesMap[id] && !this.#validateNote(id, first)){
+                    if(this.musicData.activeNotesMap[id] && !this.#validateNote(id, first).valid){
                         document.querySelector(`[id="${id}"]`)?.setAttribute("wait", "");
                         allNotesPassed = false;
                     }
@@ -380,7 +383,7 @@ export class MusicEngine{
             }
             for(const id of offEvents){
                 if(this.musicData.activeNotesMap[id]){
-                    if(this.sheetData.options.mode != "learn") this.#validateNote(id, first);
+                    if(this.sheetData.options.mode != "learn") this.#validateNote(id, first).valid;
                     for(let i=0; i< this.musicData.activeNotes.length; i++){
                         if(this.musicData.activeNotes[i].id == id){
                             this.musicData.activeNotes.splice(i, 1);
@@ -465,7 +468,7 @@ export class MusicEngine{
                 const html = `
                         <div class="dialog" popover id="noteDetailInfo">
                             <header>
-                                ${header}
+                                <h2 class="heading-2">${header}</h2>
                                 <button class="button" data-shape="square"><span class="msr">close</span></button> 
                             </header>
                         </div>
@@ -483,7 +486,6 @@ export class MusicEngine{
                     });
             }
             const midiValue = this.musicSheet.highlightNotes([note.getAttribute("id")]).list[0];
-            console.log("TAB", this.options.state)
             if(this.options.state == "idle"){
                 const realStaff = this.sheetData.staffInstrumentMap.internal[midiValue.staff];
                 midiValue.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi;
@@ -502,7 +504,7 @@ export class MusicEngine{
                         ()=>{this.#processActiveNotes()},
                         this.options.listinigQualityMs
                     );
-                    dialog("Noten-Diagramm", ()=>{clearInterval(this.sheetData.intervallAnalyse); this.musicData.activeNotes = []; this.musicData.activeNotesMap = {}});        
+                    dialog("Noten-Live-Diagramm", ()=>{clearInterval(this.sheetData.intervallAnalyse); this.musicData.activeNotes = []; this.musicData.activeNotesMap = {}});        
                 }
             }else if(this.options.state == "review"){
                 if(this.musicData.noteDiagramMap[midiValue.id])
@@ -551,8 +553,8 @@ export class MusicEngine{
     #processActiveNotes() {
         this.micAnalyser.analyseMic(this.musicData.activeNotes);
         for (const noteObj of this.musicData.activeNotes){
-            this.#validateNote(noteObj.id, false);
-            this.diagramHelper.updateNoteDiagramm(noteObj.centDeviations, noteObj.maxCountDeviations, this.musicData.noteDiagramMap[noteObj.id]);
+            const {valid, score} = this.#validateNote(noteObj.id, false);
+            this.diagramHelper.updateNoteDiagramm(score, noteObj.centDeviations, noteObj.maxCountDeviations, this.musicData.noteDiagramMap[noteObj.id]);
             if (this.sheetData.options.mode == "learn"){
                 const now = Date.now();
                 if((noteObj.score[noteObj.score.length-1] || 0) < 0.1){
@@ -604,7 +606,7 @@ export class MusicEngine{
      * Überprüft gespielte Note
      * @param {string} id
      * @param {boolean} [isFinalCheck] Wenn true wird der Score in die finale Statistik gepackt.
-     * @returns {boolean} Wert ob akzeptabel war.
+     * @returns {{valid:boolean, score:number}} Wert ob akzeptabel war.
      */
     #validateNote(id, isFinalCheck = false) {
         const note = this.musicData.activeNotesMap[id];
@@ -642,7 +644,7 @@ export class MusicEngine{
             this.sheetData.style.notesValidationCss.textContent += `[id="${note.id}"]{--note-color:${color}}`
         }
 
-        return flagAllpassed;
+        return {valid:flagAllpassed,score:score};
     }
 
     toogleVolume(){
@@ -758,10 +760,20 @@ export class MusicEngine{
                 `).join(" ")}
                 </select>
             </label>
-            <lable>
-                <h3>Noten Diagramme anzeigen</h3>
-                <input type="checkbox" name="showNoteDiagramsOnAnalyse" data-shape="toggle" ${this.sheetData.options.showNoteDiagramsOnAnalyse?"checked":""}>
-            </lable>
+            <div style="display:flex; flex-wrap:warp; gap:1rem">
+                <lable>
+                    <h3>Noten-Diagramme bei Analyse</h3>
+                    <input type="checkbox" name="showNoteDiagramsOnAnalyse" data-shape="toggle" ${this.sheetData.options.showNoteDiagramsOnAnalyse?"checked":""}>
+                </lable>
+                <lable>
+                    <h3>Noten Diagram bei klick</h3>
+                    <input type="checkbox" name="showNoteDiagramOnTab" data-shape="toggle" ${this.sheetData.options.showNoteDiagramOnTab?"checked":""}>
+                </lable>
+                <lable>
+                    <h3>Feedback anzeigen</h3>
+                    <input type="checkbox" name="showReview" data-shape="toggle" ${this.sheetData.options.showReview?"checked":""}>
+                </lable>
+            </div>
             <label for="sheet_mode">
                 <h3 class="heading-3">Spielmodus</h3>
                 <select id="sheet_mode" name="mode"><option value="normal">Normal</option><option value="learn">Lernen</option></select>
@@ -863,6 +875,8 @@ export class MusicEngine{
             this.sheetData.options.noteAnalyse = data.noteAnalyse;
             this.sheetData.options.showNoteNames = data.showNoteNames? data.showNoteNames.map(Number):[];
             this.sheetData.options.showNoteDiagramsOnAnalyse = data.showNoteDiagramsOnAnalyse;
+            this.sheetData.options.showNoteDiagramOnTab = data.showNoteDiagramOnTab;
+            this.sheetData.options.showReview = data.showReview;
             await this.db_helper.setSheetOptions(this.sheetData.sheetId, this.sheetData.options);
 
             for(const transSemi of data.transSemi){

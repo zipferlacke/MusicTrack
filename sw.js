@@ -1,4 +1,4 @@
-const APP_VERSION = 'v1.0.4';
+const APP_VERSION = 'v1.0.5';
 const networkFirst = ["/sw.js", "/appdata/messages.json", "/appdata/manifest.json"];
 
 // urlsToCache kann jetzt leer sein, da wir alles dynamisch cachen
