@@ -35,6 +35,21 @@
  * @property {{id:string, text:string}[]} noteAnnotations Map mit Id der Note und dem Text
  * @property {Instrument[]} instruments Liste der Instrumnte
  * @property {{<number>:Instrument, internal:{<number>:number}}} staffInstrumentMap Map mit Staff-ID zu Instrument, internal-Map mit aktueller Staff-ID zu ursprünglichen. 
- * @property {{mode:"normal"|"learn", bpm:number, defaultBPM:number, firstOpen:boolean, skipRest:"auto"|"ask"|"never", noteAnalyse:"holding"|"declining", showNoteNames:number[], drawNoteDiagrams:boolean}} options Map mit den Useroptionen
+ * @property {UserOptions} options Map mit den Useroptionen
  */
+
+/**
+ * @typedef UserOptions
+ * @property {"normal"|"learn"} mode Spiel Modus des Stückes
+ * @property {number} bpm Aktuelle BPM
+ * @property {number} defaultBPM Standard BPM-Wert
+ * @property {"auto"|"ask"|"never"} skipRest Einstellung fürs Pausen überspringen
+ * @property {boolean} firstOpen Wert ob das File das erste mal überhaupt geöffnet wurde
+ * @property {"holding"|"declining"} noteAnalyse Einstellung wie die Noten Analysiert werden sollen
+ * @property {number[]} showNoteNames Liste mit den Ids der Instrumente deren Notennamen angezeigt werden sollen
+ * @property {boolean} showNoteDiagramsOnAnalyse Einstellung ob Noten-Diagramme wärend der Analyse angezeigt werden sollen
+ * @property {boolean} skipReview Einstellung ob die Review Ansicht übersprungen werden soll
+ * @property {boolean} showNoteDiagramOnTab Einstellung ob Noten-Diagram beim drauf klicken angezeigt werden soll
+ */
+
 export {}

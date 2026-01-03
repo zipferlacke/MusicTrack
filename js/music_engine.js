@@ -16,17 +16,17 @@ import * as Types from "./types.js";
 
 export class MusicEngine{
     /**
-     * @type {{sound:Boolean, analyse:Boolean, state:"idle"|"running"|"paused"|"waiting", playIndex:number, edit:boolean, load:boolean, listinigQualityMs:number, centOptions:{analyseRadius:number,yellowRadius:number, greenRadius:number}}}
+     * @type {{sound:Boolean, analyse:Boolean, state:"idle"|"running"|"paused"|"waiting"|"review"|"edit", playIndex:number, edit:boolean, load:boolean, listinigQualityMs:number, centOptions:{analyseRadius:number,yellowRadius:number, greenRadius:number}}}
      */
     options = {sound:false, analyse:true, state:"idle", playIndex:0, edit:false, load:true, loadingScreen:[], centOptions:{analyseRadius:75, yellowRadius:25, greenRadius:10}, listinigQualityMs:25}
     /**
      * @type {{
-     *  htmlElm: {sheetNotes:HTMLElement, sheetScore:HTMLElement, sheetTitle:HTMLElement, sheetComposer:HTMLElement, sheetBPM:HTMLInputElement, sheetSettings:HTMLInputElement, micGraphElm:HTMLCanvasElement, sheetEdit:HTMLElement, noteDiagrams:HTMLElement, legend:HTMLElement}, 
+     *  htmlElm: {appContent:HTMLElement, sheetNotes:HTMLElement, sheetScore:HTMLElement, sheetTitle:HTMLElement, sheetComposer:HTMLElement, sheetBPM:HTMLInputElement, sheetSettings:HTMLInputElement, micGraphElm:HTMLCanvasElement, sheetEdit:HTMLElement, noteDiagrams:HTMLElement, legend:HTMLElement, sheetCloseReview:HTMLElement}, 
      *  style: {noAnalyseCSS:HTMLElement, notesValidationCss: HTMLElement},
      *  score:{value:number, scoresSum:number, scoresAmount:number}, 
      *  finished:boolean, 
      *  sheetId:number,
-     *  options:{mode:"normal"|"learn", bpm:number, defaultBPM:number, firstOpen:boolean, skipRest:"auto"|"ask"|"never", noteAnalyse:"holding"|"declining", showNoteNames:number[], drawNoteDiagrams:boolean},
+     *  options:Types.UserOptions,
      *  instruments: Types.Instrument[],
      *  staffInstrumentMap: {<number>:Types.Instrument, internal:{<number>:number}},
      *  noteAnnotations:{id:string, text:string}[],
@@ -37,6 +37,7 @@ export class MusicEngine{
      */
     sheetData = {
         htmlElm:{
+            appContent:document.querySelector(".app_content"),
             sheetScore:document.querySelector(".sheet_score"),
             sheetTitle:document.querySelector(".sheet_title"),
             sheetComposer:document.querySelector(".sheet_composer"),
@@ -49,6 +50,7 @@ export class MusicEngine{
             micGraphElm:null,
             noteDiagrams:document.querySelector("#noteDiagrams"),
             legend:document.querySelector("#legend"),
+            sheetCloseReview: document.querySelector("#sheet_close_review")
         },
         style:{
             noAnalyseCSS:document.querySelector(".no_analyse_css"),
@@ -57,7 +59,7 @@ export class MusicEngine{
         score:{scoresSum:0, scoresAmount:0, value:0},
         finished:false, 
         sheetId:null,
-        options:{mode:"normal", bpm:120, defaultBPM:120, firstOpen:true, skipRest:"auto", noteAnalyse:"declining", showNoteNames:[], drawNoteDiagrams:true},
+        options:{mode:"normal", bpm:120, defaultBPM:120, firstOpen:true, skipRest:"auto", noteAnalyse:"declining", showNoteNames:[], showNoteDiagramsOnAnalyse:true, showNoteDiagramOnTab:true, skipReview:false},
         instruments: [],
         noteAnnotations:[],
         staffInstrumentMap : {},
@@ -179,16 +181,25 @@ export class MusicEngine{
 
 		this.sheetData.htmlElm.sheetNotes.addEventListener("click", this.#noteTab.bind(this));
 		this.sheetData.htmlElm.sheetEdit.addEventListener("click", () => {
-            this.options.edit = !this.options.edit;
-
-            showBanner(this.options.edit?"Modus: Bearbeiten":"Modus: normal", "info", 3000);
-            this.sheetData.htmlElm.sheetEdit.dataset.edit=this.options.edit;
+            if(this.options.state != "edit"){
+                this.options.state = "edit"
+                this.sheetData.htmlElm.appContent.dataset.state = "edit";
+                showBanner("Modus: Bearbeiten", "info", 3000);
+            }else{
+                this.options.state = "idle"
+                this.sheetData.htmlElm.appContent.dataset.state = "idle";
+                showBanner("Modus: normal", "info", 3000);
+            }
+            this.sheetData.htmlElm.sheetEdit.dataset.state = this.options.state;
         });
+
+        this.sheetData.htmlElm.sheetCloseReview.addEventListener("click", () => {
+            this.#closeReview();
+        })
         this.#showLoadingAnimation(false);
     }
 
     /**
-     * 
      * @param {[]} array 
      */
     async #changeVisibleInstruments(array){
@@ -229,29 +240,10 @@ export class MusicEngine{
             this.sheetData.style.notesValidationCss.textContent = "";
             this.sheetData.htmlElm.noteDiagrams.innerHTML = "";
         }
-        let lastTime = Date.now()
         if(this.options.analyse) {
             await this.micAnalyser.startListinig();
             this.sheetData.intervallAnalyse = setInterval(
-                () => {
-                    this.micAnalyser.analyseMic(this.musicData.activeNotes);
-                    lastTime = Date.now();
-                    for (const noteObj of this.musicData.activeNotes){
-                        this.#validateNote(noteObj.id, false);
-                        this.diagramHelper.updateNoteDiagramm(noteObj.centDeviations, noteObj.maxCountDeviations, this.musicData.noteDiagramMap[noteObj.id]);
-                         if (this.sheetData.options.mode == "learn"){
-                            if((noteObj.score[noteObj.score.length-1] || 0) < 0.1){
-                                noteObj.startTime = lastTime;
-                            }
-
-                            if(this.options.state == "waiting"){
-                                this.options.state = "running"
-                                console.log("restart active");
-                                setTimeout(()=> {this.step(false)}, (noteObj.startTime+noteObj.duration)-Date.now());
-                            }
-                         }
-                    }
-                },  
+                ()=>{this.#processActiveNotes()},
                 this.options.listinigQualityMs
             ); 
         }
@@ -262,6 +254,8 @@ export class MusicEngine{
 
         this.#showLoadingAnimation(false);
         this.options.state = "running";
+        this.sheetData.htmlElm.appContent.dataset.state = "running";
+
         let localBPM = 0;
         for (const instrument of this.sheetData.instruments){
             if(instrument.analyse){
@@ -303,7 +297,8 @@ export class MusicEngine{
      */
     async pause(){
         if(this.options.state == "running"){
-            this.options.state = "paused";
+            this.options.state = "paused"; 
+            this.sheetData.htmlElm.appContent.dataset.state = "paused";
             await this.micAnalyser.stopListinig();
             clearInterval(this.sheetData.intervallAnalyse);
             console.log("Wiedergabe pausiert");
@@ -312,11 +307,29 @@ export class MusicEngine{
 
     async stop(){
         this.options.playIndex=0;
-        this.options.state = "idle"
+
+        if(["running", "waiting"].includes(this.options.state)){
+            this.options.state = "review";
+            this.sheetData.htmlElm.appContent.dataset.state = "review";
+            this.sheetData.htmlElm.noteDiagrams.innerHTML = "";
+            if(this.sheetData.options.skipReview){
+                this.#closeReview()
+            }
+        }
+        
         if(this.options.analyse) await this.micAnalyser.stopListinig();
         clearInterval(this.sheetData.intervallAnalyse);
         this.musicData.timestamps = this.musicSheet.renderOverview();
         this.sheetData.htmlElm.sheetNotes.dataset.playing = false
+    }
+
+    #closeReview(){
+        this.options.state = "idle";
+        this.sheetData.htmlElm.appContent.dataset.state = "idle";
+        this.sheetData.style.notesValidationCss.textContent = "";
+        this.musicData.activeNotes = [];
+        this.musicData.activeNotesMap = {};
+        this.musicData.activeRests = [];
     }
 
     async step(first=true){
@@ -353,43 +366,30 @@ export class MusicEngine{
             if(this.sheetData.options.mode == "learn"){
                 let allNotesPassed = true;
                 for(const id of offEvents){
-                    if(this.musicData.activeNotesMap[id]){
-                        if(!this.#validateNote(id, first) && this.sheetData.options.mode == "learn"){
-                            document.querySelector(`[id="${id}"]`)?.setAttribute("wait", "");
-                            allNotesPassed = false;
-                        } 
+                    if(this.musicData.activeNotesMap[id] && !this.#validateNote(id, first)){
+                        document.querySelector(`[id="${id}"]`)?.setAttribute("wait", "");
+                        allNotesPassed = false;
                     }
                 }
+
                 if(!allNotesPassed){
                     this.options.state = "waiting";
+                    this.sheetData.htmlElm.appContent.dataset.state = "waiting";
                     return
                 }
-                for(const id of offEvents){
-                    if(this.musicData.activeNotesMap[id]){
-                        for(let i=0; i< this.musicData.activeNotes.length; i++){
-                            if(this.musicData.activeNotes[i].id == id){
-                                this.musicData.activeNotes.splice(i, 1);
-                                break;
-                            }
+            }
+            for(const id of offEvents){
+                if(this.musicData.activeNotesMap[id]){
+                    if(this.sheetData.options.mode != "learn") this.#validateNote(id, first);
+                    for(let i=0; i< this.musicData.activeNotes.length; i++){
+                        if(this.musicData.activeNotes[i].id == id){
+                            this.musicData.activeNotes.splice(i, 1);
+                            break;
                         }
-                        this.musicData.noteDiagramMap[id].remove();
                     }
-                    delete this.musicData.activeNotesMap[id];
+                    this.musicData.noteDiagramMap[id].remove();
                 }
-            }else{
-                for(const id of offEvents){
-                    if(this.musicData.activeNotesMap[id]){
-                        this.#validateNote(id, first)
-                        for(let i=0; i< this.musicData.activeNotes.length; i++){
-                            if(this.musicData.activeNotes[i].id ==id){
-                                this.musicData.activeNotes.splice(i, 1);
-                                break;
-                            }
-                        }
-                        this.musicData.noteDiagramMap[id].remove();
-                    }
-                    delete this.musicData.activeNotesMap[id];
-                }
+                delete this.musicData.activeNotesMap[id];
             }
         }
 
@@ -407,7 +407,7 @@ export class MusicEngine{
                     this.musicData.activeNotes.push(note);
                     this.musicData.activeNotesMap[note.id] = note;
                     this.musicData.noteDiagramMap[note.id] = this.diagramHelper.createNoteDiagramm({id:note.id, centVarianceAnalyse:this.options.centOptions.analyseRadius, centVarianceOk:this.options.centOptions.yellowRadius, centVarianceTop:this.options.centOptions.greenRadius})
-                    if(this.sheetData.options.drawNoteDiagrams) this.sheetData.htmlElm.noteDiagrams.insertAdjacentElement("beforeend", this.musicData.noteDiagramMap[note.id]);
+                    if(this.sheetData.options.showNoteDiagramsOnAnalyse) this.sheetData.htmlElm.noteDiagrams.insertAdjacentElement("beforeend", this.musicData.noteDiagramMap[note.id]);
                 }
 
                 if(this.options.sound){
@@ -452,24 +452,63 @@ export class MusicEngine{
                             this.musicData.skipRests[lastTime] = elm.tstamp - 60000/this.sheetData.options.bpm*6;
                         }
                     }
-
                 }
             }
         }
     }
 
     async #noteTab(e){
-        if(e.target.closest(".note") && this.options.state != "running"){
-            /**@type {HTMLElement} */
-            const note = e.target.closest(".note")
+        /**@type {HTMLElement} */
+        const note = e.target.closest(".note")
+        if(note && this.options.state != "running"){    
+            const dialog = (header, cleanup)=>{
+                const html = `
+                        <div class="dialog" popover id="noteDetailInfo">
+                            <header>
+                                ${header}
+                                <button class="button" data-shape="square"><span class="msr">close</span></button> 
+                            </header>
+                        </div>
+                    `;
+                    const noteDetailInfo = document.createRange().createContextualFragment(html).firstElementChild;
+                    document.body.insertAdjacentElement("beforeend", noteDetailInfo);
 
-            if(!this.options.edit){
-                const midiValue = this.musicSheet.highlightNotes([note.getAttribute("id")]).list[0];
+                    noteDetailInfo.insertAdjacentElement("beforeend", this.musicData.noteDiagramMap[midiValue.id])
+                    noteDetailInfo.showPopover();
+
+                    const closeBtn = noteDetailInfo.querySelector("button");
+                    closeBtn.addEventListener("click", ()=>{noteDetailInfo.remove(); cleanup()});
+                    noteDetailInfo.addEventListener("toggle", (e) => {
+                        if (e.newState === "closed") {noteDetailInfo.remove(); cleanup()};
+                    });
+            }
+            const midiValue = this.musicSheet.highlightNotes([note.getAttribute("id")]).list[0];
+            console.log("TAB", this.options.state)
+            if(this.options.state == "idle"){
                 const realStaff = this.sheetData.staffInstrumentMap.internal[midiValue.staff];
-                midiValue.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi
+                midiValue.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi;
                 this.options.playIndex = this.musicData.timestamps.findIndex( timestamp => timestamp.tstamp >= midiValue.time);
                 this.playSound(realStaff, midiValue.pitch, midiValue.duration);
-            }else{
+
+                if(this.sheetData.options.showNoteDiagramOnTab){
+                    const note = {id:midiValue.id, midi:midiValue.pitch, frequency:this.#midiToFrequency(midiValue.pitch), duration:midiValue.duration, score:[], centDeviations:[], maxCountDeviations:Math.floor(midiValue.duration/this.options.listinigQualityMs)}
+                    this.musicData.activeNotes.push(note);
+                    this.musicData.activeNotesMap[note.id] = note;
+                    this.musicData.noteDiagramMap[note.id] = this.diagramHelper.createNoteDiagramm({id:note.id, centVarianceAnalyse:this.options.centOptions.analyseRadius, centVarianceOk:this.options.centOptions.yellowRadius, centVarianceTop:this.options.centOptions.greenRadius})
+                    this.sheetData.htmlElm.noteDiagrams.insertAdjacentElement("beforeend", this.musicData.noteDiagramMap[note.id]);
+                    
+                    await this.micAnalyser.startListinig();
+                    this.sheetData.intervallAnalyse = setInterval(
+                        ()=>{this.#processActiveNotes()},
+                        this.options.listinigQualityMs
+                    );
+                    dialog("Noten-Diagramm", ()=>{clearInterval(this.sheetData.intervallAnalyse); this.musicData.activeNotes = []; this.musicData.activeNotesMap = {}});        
+                }
+            }else if(this.options.state == "review"){
+                if(this.musicData.noteDiagramMap[midiValue.id])
+                    dialog("Noten-Diagramm", ()=>{});
+
+            }else if(this.options.state == "edit"){
                 const item = this.sheetData.noteAnnotations.find(e => e.id === note.id);
                 const html = `<input type="text" value="${item?item.text:""}" name="text">`;
                 const dialogContent = await userDialog({
@@ -508,6 +547,27 @@ export class MusicEngine{
             duration: pitchDuration / 1000
         });
     }
+
+    #processActiveNotes() {
+        this.micAnalyser.analyseMic(this.musicData.activeNotes);
+        for (const noteObj of this.musicData.activeNotes){
+            this.#validateNote(noteObj.id, false);
+            this.diagramHelper.updateNoteDiagramm(noteObj.centDeviations, noteObj.maxCountDeviations, this.musicData.noteDiagramMap[noteObj.id]);
+            if (this.sheetData.options.mode == "learn"){
+                const now = Date.now();
+                if((noteObj.score[noteObj.score.length-1] || 0) < 0.1){
+                    noteObj.startTime = now;
+                }
+
+                if(this.options.state == "waiting"){
+                    this.options.state = "running"
+                    this.sheetData.htmlElm.appContent.dataset.state = "running";
+
+                    setTimeout(()=> {this.step(false)}, (noteObj.startTime+noteObj.duration)-now);
+                }
+            }
+        }
+    }  
     // playSound(staff, pitch, pitchDuration){
     //     this.musicData.instrumentFontByStaff[staff].start({
     //         note: pitch, // Die MIDI Note Number
@@ -700,7 +760,7 @@ export class MusicEngine{
             </label>
             <lable>
                 <h3>Noten Diagramme anzeigen</h3>
-                <input type="checkbox" name="drawNoteDiagrams" data-shape="toggle" ${this.sheetData.options.drawNoteDiagrams?"checked":""}>
+                <input type="checkbox" name="showNoteDiagramsOnAnalyse" data-shape="toggle" ${this.sheetData.options.showNoteDiagramsOnAnalyse?"checked":""}>
             </lable>
             <label for="sheet_mode">
                 <h3 class="heading-3">Spielmodus</h3>
@@ -802,7 +862,7 @@ export class MusicEngine{
             this.sheetData.options.skipRest = data.skipRest;
             this.sheetData.options.noteAnalyse = data.noteAnalyse;
             this.sheetData.options.showNoteNames = data.showNoteNames? data.showNoteNames.map(Number):[];
-            this.sheetData.options.drawNoteDiagrams = data.drawNoteDiagrams;
+            this.sheetData.options.showNoteDiagramsOnAnalyse = data.showNoteDiagramsOnAnalyse;
             await this.db_helper.setSheetOptions(this.sheetData.sheetId, this.sheetData.options);
 
             for(const transSemi of data.transSemi){

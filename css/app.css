@@ -25,6 +25,12 @@
         main {
             display:grid;
             gap:1rem;
+
+            &[data-state="review"]{
+                .controll{display: none;}
+                .review{display: flex;}
+            }
+            .review{display: none;}
             .controll {
                 display: flex;
                 flex-wrap: wrap;
@@ -37,8 +43,8 @@
                     width: min-content;
                 }
 
-                &:has([data-edit="true"]){
-                    *:not([data-edit="true"]){
+                &:has([data-state="edit"]){
+                    *:not([data-state="edit"]){
                         pointer-events: none;
                         --bg-input:gray;
                     }
