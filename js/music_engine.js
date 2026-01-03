@@ -127,8 +127,7 @@ export class MusicEngine{
                 soundfont: 'MusyngKite' // Oder 'FluidR3_GM'
             })
         }
-        console.log(navigator.userAgent)
-        if (/iPad|iPhone|iPod|AppleWebKit/.test(navigator.userAgent)) {
+        if (navigator.maxTouchPoints > 1 && (/iPad|iPhone|iPod|MacIntel/.test(navigator.userAgent)||/iPad|iPhone|iPod|MacIntel/.test(navigator.platform))) {
             showBanner("Na Apple Nutzer :/<br> Kein Ton? Die die rote Glocke im Kontrollzentrum deaktiviert?", "warning", 5000);
         }
 
