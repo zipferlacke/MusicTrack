@@ -25,6 +25,18 @@
         main {
             display:grid;
             gap:1rem;
+
+            &[data-state="review"]{
+                .controll{display: none;}
+                .review{display: grid;}
+            }
+            .review{
+                display: none;
+                grid-template-columns: 1fr auto;
+                h1{justify-self:center;display:flex; align-items:center;  gap:0.5rem; font-size:var(--fs-700)}
+                
+                
+            }
             .controll {
                 display: flex;
                 flex-wrap: wrap;
@@ -36,9 +48,18 @@
                     display: flex;
                     width: min-content;
                 }
+                
+                #playstack{
+                    & > *{display:none}
+                    &[data-active="play"] .playstart{display:flex}
+                    &[data-active="pause"] .playpause{display:flex}
+                    &[data-active="3"] .play3 {display:flex; background-color:var(--clr-danger-400)}
+                    &[data-active="2"] .play2 {display:flex; background-color:var(--clr-danger-400)}
+                    &[data-active="1"] .play1 {display:flex; background-color:var(--clr-danger-400)}
+                }
 
-                &:has([data-edit="true"]){
-                    *:not([data-edit="true"]){
+                &:has([data-state="edit"]){
+                    *:not([data-state="edit"]){
                         pointer-events: none;
                         --bg-input:gray;
                     }
@@ -49,19 +70,6 @@
                     height: var(--input-height);
                 }
 
-                .stack {
-                    &[data-active="play"] {
-                        .playstart {
-                            display: none;
-                        }
-                    }
-
-                    &[data-active="pause"] {
-                        .playpause {
-                            display: none;
-                        }
-                    }
-                }
 
                 .playVolume {
                     &[data-active="mute"] {
@@ -79,16 +87,20 @@
             }
             .notes{
                 height: max-content;
+                rect.bg_note{fill:transparent; stroke:none!important;}
                 &[data-playing="true"]{ 
                     overflow-x:auto;
                     scrollbar-width: none;
                 }
                 g.playing {
-                    fill: blue!important;
+                    rect.bg_note{fill:var(--clr-info-500);}
                 };
-                g.note.green {fill:green;}
-                g.note.yellow {fill:yellow;}
-                g.note.red {fill:red;}
+                g.playing[wait] {
+                    rect.bg_note{fill:var(--clr-warning-500);}
+                };
+                
+                g.note { fill: var(--note-color, var(--text-clr)); }
+                
                 g.notehead{
                     use {
                         color:transparent;
@@ -96,12 +108,63 @@
                     }
                 }
             }
+            
+            #legend{
+                list-style:none;
+                li{
+                    display:flex;
+                    gap:1rem;
+                    span:first-child{
+                        height: 1rem;
+                        width: 1rem;
+                    }
+                    [data-color="green"]{background-color: green;}
+                    [data-color="yellow"]{background-color: yellow;}
+                    [data-color="red"]{background-color: red;}
+                }
+            }
+        }
+        
+
+        #noteDetailInfo{
+            width:fit-content;
+            display: grid;
+            gap: 1rem;
+            justify-content:center;
+            header{
+                display: flex;
+                justify-content:space-between;
+                padding:0em;
+            }
         }
     }
-
-    dialog{
-        detail{
-            summary{background-color: var(bg-input);}
+    .noteDiagram{
+        border-radius: var(--br-default);
+        --noteDiagram_line: black;
+        --noteDiagram_red:var(--clr-danger-400);
+        --noteDiagram_yellow: var(--clr-warning-500);
+        --noteDiagram_green: var(--clr-success-300);
+    }
+    dialog main{
+        & > * {
+            background:var(--clr-neutral-200);
+            padding:1rem;
+            border-radius: var(--br-default);
         }
+        .settings_group{
+            display:grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap:1rem;
+            & > h2{
+                grid-column: 1/-1;
+            }
+            align-items: start;
+        }
+        details.details{
+            padding:0;
+            summary{
+                background-color: var(bg-input);
+            }
+        }    
     }
 }

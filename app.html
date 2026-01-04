@@ -23,12 +23,19 @@
         <div class="sheet_score"></div>
 
     </header>
-    <main>
+    <main class="app_content">
+        <div class="review">
+            <h1 class="heading-2"><span class="msr">leaderboard</span>Feedback</h1> <button class="button" id="sheet_close_review">Feedback schließen</button>
+        </div>
         <div class="controll"> 
+            
             <div>
-                <div class="stack" data-active="pause">
+                <div id="playstack" data-active="start">
                     <button class="playstart button" data-shape="square"><span class="msr">play_arrow</span></button>
                     <button class="playpause button" data-shape="square"><span class="msr">pause</span></button>
+                    <button class="play3 button" data-shape="square"><span class="msr">counter_3</span></button>
+                    <button class="play2 button" data-shape="square"><span class="msr">counter_2</span></button>
+                    <button class="play1 button" data-shape="square"><span class="msr">counter_1</span></button>
                 </div>
                 <button class="playstop button" data-shape="square"><span class="msr">stop</span></button>
                 <button class="playVolume button" data-shape="square" data-active="mute"><span class="msr"></span></button>
@@ -39,11 +46,13 @@
             <button class="button" data-shape="square" id="sheet_edit"><span class="msr">edit</span></button>
         </div>
         <div class="notes"></div>
+        <div id="noteDiagrams"></div>
+        <ul id="legend">
+            
+        </ul>
     </main>
     
-    <div>
-        <canvas class="scores" style="width: 100%;" width="9000" height="2000"></canvas>
-    </div>
+    
     
     <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
     <!-- <script>
@@ -74,19 +83,13 @@
 
 
 				document.querySelector(".playstart").addEventListener("click", async (e)=>{
-                    const button = e.currentTarget;
 					await musicEngine.start();
-					button.parentElement.dataset.active = "play"
 				})
 				document.querySelector(".playpause").addEventListener("click", async (e)=>{
-                    const button = e.currentTarget;
                     await musicEngine.pause();
-					button.parentElement.dataset.active = "pause"
 				})
 				document.querySelector(".playstop").addEventListener("click", async (e)=>{
-                    const button = e.currentTarget;
 					await musicEngine.stop();
-					button.parentElement.querySelector(".playstart").parentElement.dataset.active = "pause"
 				})
 				document.querySelector(".playVolume").addEventListener("click", (e)=>{
 					musicEngine.toogleVolume();

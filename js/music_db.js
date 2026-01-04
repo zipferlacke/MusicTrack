@@ -1,4 +1,6 @@
 import {openDB} from './libs/idb.js'
+import * as Types from "./types.js";
+
 const DB_NAME = 'MusicAppDB';
 const DB_VERSION = 2;
 
@@ -37,26 +39,11 @@ export class MusicDB {
             },
         });
     }
-    /**
-     * @typedef SheetData
-     * @property {string} fileName 
-     * @property {string} mimeType 
-     * @property {string} title 
-     * @property {string} subtitle 
-     * @property {string} composer 
-     * @property {number} score 
-     * @property {number} id  
-     * @property {Number} creationTime 
-     * @property {Number} lastUsed 
-     * @property {{id:string, text:string}[]} noteAnnotations
-     * @property {{id:number, name:string, transSemi:number, midiNumber:number, rhythm:[number, number] staffNumbers:number[], visible:boolean, analyse:boolean}} instruments 
-     * @property {{<number>:{id:number, name:string, transSemi:number, midiNumber:number, rhythm:[number, number] staffNumbers:number[], visible:boolean, analyse:boolean},internal:{<number>:number}}} staffInstrumentMap 
-     * @property {{mode:"normal"|"learn", bpm:number, defaultBPM:number, firstOpen:boolean, skipRest:"auto"|"ask"|"never", noteAnalyse:"holding"|"declining", showNoteNames:number[]}} options
-     */
+    
 
     /**
      * Speichert eine neue Musikdatei und ihre Metadaten
-     * @param {{title:string, subtitle:string, composer:string, instruments:{id:number, name:string, transSemi:number, midiNumber:number, rhythm:[number, number], staffNumbers:number[], visible:boolean, analyse:boolean}, staffInstrumentMap:{<number>:{name:string, trans_semi:number, rhythm:[number, number] staffNumbers:number[], visible:boolean, analyse:boolean},internal:{<number>:number}}}} fileMetaData
+     * @param {{title:string, subtitle:string, composer:string, instruments:Types.Instrument[], staffInstrumentMap:{<number>:Types.Instrument ,internal:{<number>:number}}}} fileMetaData
      * @param {string} fileString
      * @param {File} file
      * @returns {Promise<number>} Die ID der neuen Datei
@@ -66,7 +53,8 @@ export class MusicDB {
 		
         //Metadaten werden geschriben
         const tx = db.transaction('sheetMetaData', 'readwrite');
-        const sheetId = await tx.store.add({
+        /**@type {Types.SheetMetaData} */
+        const sheetMetaData = {
             title: fileMetaData.title,
             subtitle: fileMetaData.subtitle,
             composer: fileMetaData.composer,
@@ -78,8 +66,9 @@ export class MusicDB {
             score: 0,
             creationTime: Date.now(),
             lastUsed: Date.now(),
-            options:{mode:"normal", defaultBPM:fileMetaData.defaultBPM, bpm:fileMetaData.currentBPM, firstOpen:true, skipRest:"auto", noteAnalyse:"holding", showNoteNames:[]}
-        });await tx.done;
+            options:{mode:"normal", defaultBPM:fileMetaData.defaultBPM, bpm:fileMetaData.currentBPM, firstOpen:true, skipRest:"auto", noteAnalyse:"holding", showNoteNames:[], drawNoteDiagrams:true}
+        }
+        const sheetId = await tx.store.add(sheetMetaData);await tx.done;
 
         //Buffer wird geschrieben
         const tx2 = db.transaction('sheetBuffers', 'readwrite');
@@ -211,7 +200,7 @@ export class MusicDB {
     /**
      * Setzt einen neuen sheetScore für das Sheet
      * @param {number} sheetId
-     * @param {SheetData.options} sheetOptions
+     * @param {Types.SheetMetaData.options} sheetOptions
      */
     async setSheetOptions(sheetId, sheetOptions) {
         const db = await this.dbPromise;
@@ -228,10 +217,11 @@ export class MusicDB {
         
         await tx.done;
     }
+
     /**
      * Aktualisiert die Sichtbarkeit/Anaylse von den Instrumenten
      * @param {number} sheetId
-     * @param {SheetData} sheetData
+     * @param {Types.SheetMetaData} sheetData
      */
     async updateSheetInstruments(sheetId, sheetData) {
         const db = await this.dbPromise;
@@ -258,7 +248,7 @@ export class MusicDB {
 
     /**
      * Ruft die MetaDaten der übergebenden Datei ab.
-     * @returns {Promise<SheetData|null>}
+     * @returns {Promise<Types.SheetMetaData|null>}
      */
     async getSheetMetaData(sheetId) {
         if (sheetId === null) return null;
@@ -305,7 +295,7 @@ export class MusicDB {
 
     /**
      * Ruft die MetaDaten der aktiven Datei ab
-     * @returns {Promise<SheetData|null>}
+     * @returns {Promise<Types.SheetMetaData|null>}
      */
     async getActiveSheetMetaData() {
         const activeId = await this.getActiveFileId();

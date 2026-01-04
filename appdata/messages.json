@@ -9,6 +9,18 @@
 
     "changelog":[
         {
+            "version":"1.0.5",
+            "changes":[
+                "1. Die Scorebereiche wurden angepasst (siehe neue Legende).",
+                "2. Es wurden neue Ton-Diagramme eingeführt, die ein- bzw. ausgeblendet werden können.",
+                "3. Es wurde eine Feedback-Seite hinzugefügt, auf der der Tonverlauf individuell im Nachhinein angeschaut werden kann.",
+                "4. Noten können auch individuell geübt werden. Dafür in den Einstellungen unter 'Ton-Diagramm', 'Bei Klick auf Note' aktivieren.",
+                "5. Der Lernmodus wurde deutlich verbessert (die Notendauer wird nun korrekt berücksichtigt).",
+                "6. Das Vorzählen wird optisch hervorgehoben.",
+                "7. Die Einstellungen wurden umstrukturiert."
+            ]
+        },
+        {
             "version":"1.0.4",
             "changes":[
                 "1. Verbesserung der Kompatibilität mit älteren iOS/iPadOS-Versionen.",

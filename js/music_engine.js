@@ -6,77 +6,78 @@ import { userDialog } from "/wuefl-libs/userDialog/userDialog.js";
 import { SelectPicker } from "/wuefl-libs/selectpicker/selectpicker.min.js"
 import { midiInstumentTable } from "./music_metadata_extender.js";
 import Soundfont from "./libs/soundfont-player.min.js"
+import {MusicDiagrams} from "./music_digramms.js";
+import * as Types from "./types.js";
 // import { AudioContext } from 'https://jspm.dev/standardized-audio-context';
 // import { Soundfont } from 'https://cdn.jsdelivr.net/npm/smplr@0.16.3/+esm'
 
+
+
+
 export class MusicEngine{
     /**
-     * @type {{sound:Boolean, analyse:Boolean, state:"idle"|"running"|"paused", playIndex:number, edit:boolean, load:boolean}}
+     * @type {{sound:Boolean, analyse:Boolean, state:"idle"|"running"|"paused"|"waiting"|"review"|"edit", playIndex:number, edit:boolean, load:boolean, listinigQualityMs:number, centOptions:{analyseRadius:number,yellowRadius:number, greenRadius:number}}}
      */
-    options = {sound:false, analyse:true, state:"idle", playIndex:0, edit:false, load:true, loadingScreen:[]}
+    options = {sound:false, analyse:true, state:"idle", playIndex:0, edit:false, load:true, loadingScreen:[], centOptions:{analyseRadius:75, yellowRadius:25, greenRadius:10}, listinigQualityMs:25}
     /**
      * @type {{
-     *  htmlElm: {sheetNotes:HTMLElement, sheetScore:HTMLElement, sheetTitle:HTMLElement, sheetComposer:HTMLElement, sheetBPM:HTMLInputElement, sheetSettings:HTMLInputElement, micGraphElm:HTMLCanvasElement, sheetEdit:HTMLElement}, 
+     *  htmlElm: {appContent:HTMLElement, sheetNotes:HTMLElement, sheetScore:HTMLElement, sheetTitle:HTMLElement, sheetComposer:HTMLElement, sheetBPM:HTMLInputElement, sheetSettings:HTMLInputElement, micGraphElm:HTMLCanvasElement, sheetEdit:HTMLElement, noteDiagrams:HTMLElement, legend:HTMLElement, sheetCloseReview:HTMLElement, sheetPlayStack:HTMLElement}, 
      *  style: {noAnalyseCSS:HTMLElement, notesValidationCss: HTMLElement},
      *  score:{value:number, scoresSum:number, scoresAmount:number}, 
      *  finished:boolean, 
      *  sheetId:number,
-     *  sheetBpmDefault:number,
-     *  sheetBpmFactor:number,
-     *  validateNoteStepIntervall:number|null,
-     *  startRhythm: {denominator:number, numerator:number},
-     *  options:{mode:"normal"|"learn", bpm:number, defaultBPM:number, firstOpen:boolean, skipRest:"auto"|"ask"|"never", noteAnalyse:"holding"|"declining", showNoteNames:number[]},
-     *  instruments: {id:number, name:string, transSemi:number, midiNumber:number, rhythm:[number, number] staffNumbers:number[], visible:boolean, analyse:boolean}[],
-     *  staffInstrumentMap: {<number>:{id:number, name:string, transSemi:number, midiNumber:number, rhythm:[number, number], staffNumbers:number[], visible:boolean, analyse:boolean}, internal:{<number>:number}},
+     *  options:Types.UserOptions,
+     *  instruments: Types.Instrument[],
+     *  staffInstrumentMap: {<number>:Types.Instrument, internal:{<number>:number}},
      *  noteAnnotations:{id:string, text:string}[],
      *  pageLoaded:boolean,
-     *  skipOptions:{{skipStart:skipEnd}};
+     *  intervallAnalyse: string|null,
+     *  skipOptions:{{skipStart:skipEnd}},
      * }}
      */
     sheetData = {
         htmlElm:{
+            appContent:document.querySelector(".app_content"),
             sheetScore:document.querySelector(".sheet_score"),
             sheetTitle:document.querySelector(".sheet_title"),
             sheetComposer:document.querySelector(".sheet_composer"),
-            // sheetVisibleInstuments:document.querySelector("#visible_instuments"),
-            // sheetAnalyseInstuments:document.querySelector("#analyse_instuments"),
-            // sheetMode:document.querySelector("#sheet_mode"),
             sheetBPM:document.querySelector("#sheet_bpm"),
             sheetSettings:document.querySelector("#sheet_settings"),
             sheetEdit:document.querySelector("#sheet_edit"),
-            micGraphElm:null
+            micGraphElm:null,
+            noteDiagrams:document.querySelector("#noteDiagrams"),
+            legend:document.querySelector("#legend"),
+            sheetCloseReview: document.querySelector("#sheet_close_review"),
+            sheetPlayStack: document.querySelector("#playstack")
         },
         style:{
             noAnalyseCSS:document.querySelector(".no_analyse_css"),
             notesValidationCss:document.querySelector(".notes_validation_css"),
-            
         }, 
         score:{scoresSum:0, scoresAmount:0, value:0},
         finished:false, 
         sheetId:null,
-        sheetBpmDefault:null,
-        sheetBpmFactor:null,
-        validateNoteStepIntervall:null,
-        startRhythm: {denominator:4, numerator:4},
-        options:{},
+        options:{mode:"normal", bpm:120, defaultBPM:120, firstOpen:true, skipRest:"auto", noteAnalyse:"declining", showNoteNames:[], showNoteDiagramsOnAnalyse:false, showNoteDiagramOnTab:false, showReview:true},
         instruments: [],
         noteAnnotations:[],
         staffInstrumentMap : {},
         pageLoaded: false,
         skipOptions: [],
+        intervallAnalyse:null
     };
 
     /**
      * @type {{
-     *  activeNotes:{id:string, frequency:number, duration:number, score:Number[], midi:Number},
-     *  activeNotesMap:Object<number,{id:string, frequency:number, duration:number, score:Number[], midi:Number}>,
+     *  activeNotes: Types.Note[],
+     *  activeNotesMap:Object<number,Types.Note>,
      *  timestamps: {on:string[]|null, off:string[]|null, tstamp:number}[],
      *  activeRests:string[],
      *  skipRests:Object<number, number>,
-     *  instrumentFontByStaff: Object<string, Soundfont>
+     *  instrumentFontByStaff: Object<string, Soundfont>,
+     *  noteDiagramMap: Object<string, SVGElement>
      * }}
      */
-    musicData = {activeNotes:[], activeNotesMap:{}, timestamps:[], activeRests:[], skipRests:[], instrumentFontByStaff:{}};
+    musicData = {activeNotes:[], activeNotesMap:{}, timestamps:[], activeRests:[], skipRests:[], instrumentFontByStaff:{}, noteDiagramMap:{}};
 
     /**
      * Eine MusicEngine wird erstellt.
@@ -100,10 +101,8 @@ export class MusicEngine{
         this.#showLoadingAnimation(true);
         this.audioCTX = new AudioContext();
 
-        /**
-         * @type {MicAnalyser}
-         */
-        this.micAnalyser = new MicAnalyser(this.audioCTX, this.sheetData.htmlElm.micGraphElm);
+        this.micAnalyser = new MicAnalyser(this.audioCTX, this.sheetData.htmlElm.micGraphElm, {listinigQualityMs:this.options.listinigQualityMs, centVarianceAnalyse:this.options.centOptions.analyseRadius});
+        this.diagramHelper = new MusicDiagrams();
 
         this.sheetData.pageLoaded = true;
         await this.db_helper.updateLastUsed()
@@ -114,12 +113,12 @@ export class MusicEngine{
 
 		this.sheetData.sheetId = rawSheetMataData.id;
 		this.sheetData.score.value = rawSheetMataData.score;
-		this.sheetData.options = rawSheetMataData.options;
+		this.sheetData.options = {...this.sheetData.options, ...rawSheetMataData.options}
+
 		this.sheetData.noteAnnotations = rawSheetMataData.noteAnnotations;
         this.sheetData.instruments = rawSheetMataData.instruments;
         this.sheetData.staffInstrumentMap = rawSheetMataData.staffInstrumentMap;
 		this.sheetData.htmlElm.sheetScore.innerHTML = `<progress max="1" value="${this.sheetData.score.value}"></progress><span>${(this.sheetData.score.value*100).toFixed(0)}/100</span>`;
-        
         for (const staffId of Object.keys(this.sheetData.staffInstrumentMap)){
             if(staffId == "internal") continue;
             // this.musicData.instrumentFontByStaff[staffId] = await new Soundfont(this.audioCTX, {instrument: midiInstumentTable[this.sheetData.staffInstrumentMap[staffId].midiNumber], kit: "FluidR3_GM"}).load;
@@ -128,10 +127,16 @@ export class MusicEngine{
                 soundfont: 'MusyngKite' // Oder 'FluidR3_GM'
             })
         }
-        console.log(navigator.userAgent)
-        if (/iPad|iPhone|iPod|AppleWebKit/.test(navigator.userAgent)) {
+        if (navigator.maxTouchPoints > 1 && (/iPad|iPhone|iPod|MacIntel/.test(navigator.userAgent)||/iPad|iPhone|iPod|MacIntel/.test(navigator.platform))) {
             showBanner("Na Apple Nutzer :/<br> Kein Ton? Die die rote Glocke im Kontrollzentrum deaktiviert?", "warning", 5000);
         }
+
+        this.sheetData.htmlElm.legend.innerHTML = `
+            Farblegende (100 cent ist der Abstand zwischen Halbtönen)
+            <li><span data-color="green"></span><span>bis ${this.options.centOptions.greenRadius} cent Abweichung</span></li>
+            <li><span data-color="yellow"></span><span>bis ${this.options.centOptions.yellowRadius} cent Abweichung</span></li>
+            <li><span data-color="red"></span><span>bis ${this.options.centOptions.analyseRadius} cent Abweichung</span></li>
+        `
 
         if(sheet == null){
             userDialog({
@@ -148,7 +153,7 @@ export class MusicEngine{
         await this.setInstrumentVisibility(this.sheetData.instruments);
 
         this.sheetData.htmlElm.sheetTitle.innerHTML = rawSheetMataData.title;
-		this.sheetData.htmlElm.sheetComposer.innerHTML = rawSheetMataData.composer;	
+		this.sheetData.htmlElm.sheetComposer.innerHTML = rawSheetMataData.composer;
 
         this.sheetData.htmlElm.sheetBPM.value = this.sheetData.options.bpm;
 		this.sheetData.htmlElm.sheetBPM.max = this.sheetData.options.defaultBPM*4;
@@ -173,16 +178,25 @@ export class MusicEngine{
 
 		this.sheetData.htmlElm.sheetNotes.addEventListener("click", this.#noteTab.bind(this));
 		this.sheetData.htmlElm.sheetEdit.addEventListener("click", () => {
-            this.options.edit = !this.options.edit;
-
-            showBanner(this.options.edit?"Modus: Bearbeiten":"Modus: normal", "info", 3000);
-            this.sheetData.htmlElm.sheetEdit.dataset.edit=this.options.edit;
+            if(this.options.state != "edit"){
+                this.options.state = "edit"
+                this.sheetData.htmlElm.appContent.dataset.state = "edit";
+                showBanner("Modus: Bearbeiten", "info", 3000);
+            }else{
+                this.options.state = "idle"
+                this.sheetData.htmlElm.appContent.dataset.state = "idle";
+                showBanner("Modus: normal", "info", 3000);
+            }
+            this.sheetData.htmlElm.sheetEdit.dataset.state = this.options.state;
         });
+
+        this.sheetData.htmlElm.sheetCloseReview.addEventListener("click", () => {
+            this.#closeReview();
+        })
         this.#showLoadingAnimation(false);
     }
 
     /**
-     * 
      * @param {[]} array 
      */
     async #changeVisibleInstruments(array){
@@ -219,10 +233,17 @@ export class MusicEngine{
         this.sheetData.htmlElm.sheetNotes.dataset.playing = true;
         if(this.options.state == "idle"){
             this.musicData.timestamps = this.musicSheet.renderPlay();
+            [...this.sheetData.htmlElm.sheetNotes.querySelectorAll(`.note`)].map(noteElm => noteElm?.style.removeProperty('--note-color'));
             this.sheetData.style.notesValidationCss.textContent = "";
+            this.sheetData.htmlElm.noteDiagrams.innerHTML = "";
         }
-
-        if(this.options.analyse) await this.micAnalyser.startListinig();
+        if(this.options.analyse) {
+            await this.micAnalyser.startListinig();
+            this.sheetData.intervallAnalyse = setInterval(
+                ()=>{this.#processActiveNotes()},
+                this.options.listinigQualityMs
+            ); 
+        }
         const notesAtTime = this.musicData.timestamps[this.options.playIndex];
 
         if(notesAtTime.on) this.#scrollToNote(notesAtTime.on[0].id);
@@ -230,36 +251,43 @@ export class MusicEngine{
 
         this.#showLoadingAnimation(false);
         this.options.state = "running";
+        this.sheetData.htmlElm.appContent.dataset.state = "running";
+
         let localBPM = 0;
         for (const instrument of this.sheetData.instruments){
             if(instrument.analyse){
                 localBPM = this.sheetData.options.bpm * (instrument.rhythm[1]/4) 
             }
-
         }
-        const countdown = (number, midi, duration, staffNumber) =>{
+
+        const countdown = (number, midi, duration, staffNumber) => {
+            this.sheetData.htmlElm.sheetPlayStack.dataset.active = number;
             if(this.options.state != "running") return;
             if(number < 1) {
+                this.sheetData.htmlElm.sheetPlayStack.dataset.active = "pause";
                 this.step();
                 return;
             };
+
             this.playSound(staffNumber, midi, duration);
             setTimeout(()=>countdown(number-1, midi, duration, staffNumber), duration);
         }
         
+        loopStartCountdown:
         for(let localIndex = this.options.playIndex; localIndex<this.musicData.timestamps.length; localIndex++){
             const currentTimeStamp = this.musicData.timestamps[localIndex]; 
             if(currentTimeStamp.on && currentTimeStamp.on.length != 0){
-                const id = currentTimeStamp.on[0]
-                const midi = this.musicSheet.getMIDIValuesForElementId(id);
-                const realStaff = this.sheetData.staffInstrumentMap.internal[midi.staff];
-                midi.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi;
-                
-                if(this.sheetData.staffInstrumentMap[realStaff].analyse){
-                    countdown(3, midi.pitch, 60000/localBPM, realStaff);
-                    break;
+                for(let noteIndex = 0; noteIndex<currentTimeStamp.on.length; noteIndex++){
+                    const id = currentTimeStamp.on[noteIndex];
+                    const midi = this.musicSheet.getMIDIValuesForElementId(id);
+                    const realStaff = this.sheetData.staffInstrumentMap.internal[midi.staff];
+                    midi.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi;
+                    
+                    if(this.sheetData.staffInstrumentMap[realStaff].analyse){
+                        countdown(3, midi.pitch, 60000/localBPM, realStaff);
+                        break loopStartCountdown;
+                    }
                 }
-                
             }
         }
     }
@@ -269,23 +297,45 @@ export class MusicEngine{
      */
     async pause(){
         if(this.options.state == "running"){
-            this.options.state = "paused";
+            this.options.state = "paused"; 
+            this.sheetData.htmlElm.appContent.dataset.state = "paused";
+            this.sheetData.htmlElm.sheetPlayStack.dataset.active = "play";
             await this.micAnalyser.stopListinig();
+            clearInterval(this.sheetData.intervallAnalyse);
             console.log("Wiedergabe pausiert");
         }
     }
 
     async stop(){
         this.options.playIndex=0;
-        this.options.state = "idle"
+        this.sheetData.htmlElm.sheetPlayStack.dataset.active = "play";
+
+        if(["running", "waiting"].includes(this.options.state)){
+            this.options.state = "review";
+            this.sheetData.htmlElm.appContent.dataset.state = "review";
+            this.sheetData.htmlElm.noteDiagrams.innerHTML = "";
+            if(!this.sheetData.options.showReview){
+                this.#closeReview()
+            }
+        }
+        
         if(this.options.analyse) await this.micAnalyser.stopListinig();
+        clearInterval(this.sheetData.intervallAnalyse);
         this.musicData.timestamps = this.musicSheet.renderOverview();
         this.sheetData.htmlElm.sheetNotes.dataset.playing = false
     }
 
-    async step(){
+    #closeReview(){
+        this.options.state = "idle";
+        this.sheetData.htmlElm.appContent.dataset.state = "idle";
+        this.sheetData.style.notesValidationCss.textContent = "";
+        this.musicData.activeNotes = [];
+        this.musicData.activeNotesMap = {};
+        this.musicData.activeRests = [];
+    }
+
+    async step(first=true){
         if(this.options.state != "running") return;
-        this.micAnalyser.setFrequencyData(this.options.analyse ? this.musicData.activeNotes : []);
         
         const skipToTime = this.musicData.skipRests[this.musicData.timestamps[this.options.playIndex].tstamp] 
         if(skipToTime){
@@ -315,18 +365,33 @@ export class MusicEngine{
         }
 
         if(offEvents){
+            if(this.sheetData.options.mode == "learn"){
+                let allNotesPassed = true;
+                for(const id of offEvents){
+                    if(this.musicData.activeNotesMap[id] && !this.#validateNote(id, first).valid){
+                        document.querySelector(`[id="${id}"]`)?.setAttribute("wait", "");
+                        allNotesPassed = false;
+                    }
+                }
+
+                if(!allNotesPassed){
+                    this.options.state = "waiting";
+                    this.sheetData.htmlElm.appContent.dataset.state = "waiting";
+                    return
+                }
+            }
             for(const id of offEvents){
-                const midi = this.musicSheet.getMIDIValuesForElementId(id);
-                if(this.musicData.activeNotesMap[midi.id]){
-                    await this.#validateNote(midi.id);
+                if(this.musicData.activeNotesMap[id]){
+                    if(this.sheetData.options.mode != "learn") this.#validateNote(id, first).valid;
                     for(let i=0; i< this.musicData.activeNotes.length; i++){
-                        if(this.musicData.activeNotes[i].id == midi.id){
+                        if(this.musicData.activeNotes[i].id == id){
                             this.musicData.activeNotes.splice(i, 1);
                             break;
                         }
                     }
+                    this.musicData.noteDiagramMap[id].remove();
                 }
-                delete this.musicData.activeNotesMap[midi.id];
+                delete this.musicData.activeNotesMap[id];
             }
         }
 
@@ -337,9 +402,14 @@ export class MusicEngine{
                 midi.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi;
                 
                 if(this.sheetData.staffInstrumentMap[realStaff].analyse){
-                    const note = {id:midi.id, midi:midi.pitch, frequency:this.#midiToFrequency(midi.pitch), duration:midi.duration, score:[]}
+                    /** 
+                     * @type {Types.Note}
+                     */
+                    const note = {id:midi.id, midi:midi.pitch, frequency:this.#midiToFrequency(midi.pitch), duration:midi.duration, score:[], centDeviations:[], maxCountDeviations:Math.floor(midi.duration/this.options.listinigQualityMs)}
                     this.musicData.activeNotes.push(note);
                     this.musicData.activeNotesMap[note.id] = note;
+                    this.musicData.noteDiagramMap[note.id] = this.diagramHelper.createNoteDiagram({id:note.id, centVarianceAnalyse:this.options.centOptions.analyseRadius, centVarianceOk:this.options.centOptions.yellowRadius, centVarianceTop:this.options.centOptions.greenRadius})
+                    if(this.sheetData.options.showNoteDiagramsOnAnalyse) this.sheetData.htmlElm.noteDiagrams.insertAdjacentElement("beforeend", this.musicData.noteDiagramMap[note.id]);
                 }
 
                 if(this.options.sound){
@@ -360,6 +430,9 @@ export class MusicEngine{
         if(this.options.playIndex < this.musicData.timestamps.length){
             setTimeout(()=>this.step(), this.musicData.timestamps[this.options.playIndex].tstamp - currentTimeStamp.tstamp);
         }else{
+            this.sheetData.score.value = this.sheetData.score.scoresSum / this.sheetData.score.scoresAmount;
+            this.sheetData.htmlElm.sheetScore.innerHTML = `<progress max="1" value="${this.sheetData.score.value}"></progress><span>${(this.sheetData.score.value*100).toFixed(0)}/100</span>`;
+            this.db_helper.setSheetScore(this.sheetData.sheetId, this.sheetData.score.value);
             this.stop();
         } 
     }
@@ -381,24 +454,62 @@ export class MusicEngine{
                             this.musicData.skipRests[lastTime] = elm.tstamp - 60000/this.sheetData.options.bpm*6;
                         }
                     }
-
                 }
             }
         }
     }
 
     async #noteTab(e){
-        if(e.target.closest(".note") && this.options.state != "running"){
-            /**@type {HTMLElement} */
-            const note = e.target.closest(".note")
+        /**@type {HTMLElement} */
+        const note = e.target.closest(".note")
+        if(note && this.options.state != "running"){    
+            const dialog = (header, cleanup)=>{
+                const html = `
+                        <div class="dialog" popover id="noteDetailInfo">
+                            <header>
+                                <h2 class="heading-2">${header}</h2>
+                                <button class="button" data-shape="square"><span class="msr">close</span></button> 
+                            </header>
+                        </div>
+                    `;
+                    const noteDetailInfo = document.createRange().createContextualFragment(html).firstElementChild;
+                    document.body.insertAdjacentElement("beforeend", noteDetailInfo);
 
-            if(!this.options.edit){
-                const midiValue = this.musicSheet.highlightNotes([note.getAttribute("id")]).list[0];
+                    noteDetailInfo.insertAdjacentElement("beforeend", this.musicData.noteDiagramMap[midiValue.id])
+                    noteDetailInfo.showPopover();
+
+                    const closeBtn = noteDetailInfo.querySelector("button");
+                    closeBtn.addEventListener("click", ()=>{noteDetailInfo.remove(); cleanup()});
+                    noteDetailInfo.addEventListener("toggle", (e) => {
+                        if (e.newState === "closed") {noteDetailInfo.remove(); cleanup()};
+                    });
+            }
+            const midiValue = this.musicSheet.highlightNotes([note.getAttribute("id")]).list[0];
+            if(this.options.state == "idle"){
                 const realStaff = this.sheetData.staffInstrumentMap.internal[midiValue.staff];
-                midiValue.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi
+                midiValue.pitch += this.sheetData.staffInstrumentMap[realStaff].transSemi;
                 this.options.playIndex = this.musicData.timestamps.findIndex( timestamp => timestamp.tstamp >= midiValue.time);
                 this.playSound(realStaff, midiValue.pitch, midiValue.duration);
-            }else{
+
+                if(this.sheetData.options.showNoteDiagramOnTab){
+                    const note = {id:midiValue.id, midi:midiValue.pitch, frequency:this.#midiToFrequency(midiValue.pitch), duration:midiValue.duration, score:[], centDeviations:[], maxCountDeviations:Math.floor(midiValue.duration/this.options.listinigQualityMs)}
+                    this.musicData.activeNotes.push(note);
+                    this.musicData.activeNotesMap[note.id] = note;
+                    this.musicData.noteDiagramMap[note.id] = this.diagramHelper.createNoteDiagram({id:note.id, centVarianceAnalyse:this.options.centOptions.analyseRadius, centVarianceOk:this.options.centOptions.yellowRadius, centVarianceTop:this.options.centOptions.greenRadius})
+                    this.sheetData.htmlElm.noteDiagrams.insertAdjacentElement("beforeend", this.musicData.noteDiagramMap[note.id]);
+                    
+                    await this.micAnalyser.startListinig();
+                    this.sheetData.intervallAnalyse = setInterval(
+                        ()=>{this.#processActiveNotes()},
+                        this.options.listinigQualityMs
+                    );
+                    dialog("Ton-Live-Diagramm", ()=>{clearInterval(this.sheetData.intervallAnalyse); this.musicData.activeNotes = []; this.musicData.activeNotesMap = {}});        
+                }
+            }else if(this.options.state == "review"){
+                if(this.musicData.noteDiagramMap[midiValue.id])
+                    dialog("Ton-Diagramm", ()=>{});
+
+            }else if(this.options.state == "edit"){
                 const item = this.sheetData.noteAnnotations.find(e => e.id === note.id);
                 const html = `<input type="text" value="${item?item.text:""}" name="text">`;
                 const dialogContent = await userDialog({
@@ -437,6 +548,27 @@ export class MusicEngine{
             duration: pitchDuration / 1000
         });
     }
+
+    #processActiveNotes() {
+        this.micAnalyser.analyseMic(this.musicData.activeNotes);
+        for (const noteObj of this.musicData.activeNotes){
+            const {valid, score} = this.#validateNote(noteObj.id, false);
+            this.diagramHelper.updateNoteDiagram(score, noteObj.centDeviations, noteObj.maxCountDeviations, this.musicData.noteDiagramMap[noteObj.id]);
+            if (this.sheetData.options.mode == "learn"){
+                const now = Date.now();
+                if((noteObj.score[noteObj.score.length-1] || 0) < 0.1){
+                    noteObj.startTime = now;
+                }
+
+                if(this.options.state == "waiting"){
+                    this.options.state = "running"
+                    this.sheetData.htmlElm.appContent.dataset.state = "running";
+
+                    setTimeout(()=> {this.step(false)}, (noteObj.startTime+noteObj.duration)-now);
+                }
+            }
+        }
+    }  
     // playSound(staff, pitch, pitchDuration){
     //     this.musicData.instrumentFontByStaff[staff].start({
     //         note: pitch, // Die MIDI Note Number
@@ -472,94 +604,46 @@ export class MusicEngine{
     /**
      * Überprüft gespielte Note
      * @param {string} id
-     * @param {boolean} [first] 
-     * @returns {Promise<void>} Eine Promise, die aufgelöst wird, wenn der nächste Schritt möglich ist.
+     * @param {boolean} [isFinalCheck] Wenn true wird der Score in die finale Statistik gepackt.
+     * @returns {{valid:boolean, score:number}} Wert ob akzeptabel war.
      */
-    async #validateNote(id, first = true) {
-        // Die Funktion gibt sofort eine Promise zurück
-        return new Promise((resolve) => {
-            if (this.options.state !== "running") {
-                // Bei nicht laufendem Zustand sofort auflösen/abbrechen
-                console.warn("Not running")
-                return resolve();
-            }
+    #validateNote(id, isFinalCheck = false) {
+        const note = this.musicData.activeNotesMap[id];
+        if (!note) {
+            // Bei nicht laufendem Zustand sofort auflösen/abbrechen
+            console.warn("No note")
+        }
 
-            const note = this.musicData.activeNotesMap[id];
+        let score;
+        if(this.sheetData.options.noteAnalyse == "declining"){
+            score = note.score.length === 0 
+            ? 0 
+            : note.score.reduce((res, curr, i) => res + (curr * (note.score.length - i)), 0) / ((note.score.length * (note.score.length + 1)) / 2);
+        }else{
+            score = note.score.length === 0 ? 0:note.score.reduce((res, curr) => res + curr)/note.score.length;
+        }
 
-            if (!note) {
-                // Note nicht gefunden, sofort auflösen
-                console.warn("Note nicht gefunden")
-                return resolve();
-            }
+        // Logik zum Färben und Prüfen (unverändert, außer Intervall-Logik)
+        let flagAllpassed = true;
+        let color ="";
+        const noteElm = document.querySelector(`[id="${note.id}"]`);
+        if (score > 1-(this.options.centOptions.greenRadius/this.options.centOptions.analyseRadius)) {
+            color = 'green';
+        } else if (score > 1-(this.options.centOptions.yellowRadius/this.options.centOptions.analyseRadius)) {
+            color = 'yellow';
+        } else {
+            flagAllpassed = false;
+            color = 'red';
+        }
 
-            // Deklaration außerhalb der Schleife, damit sie im Intervall zugänglich ist
-            let intervalId = null;
-            let flagAllpassed = true; // Setze initial auf true
+        noteElm?.style.setProperty('--note-color', color);
+        if (isFinalCheck) {
+            this.sheetData.score.scoresSum += score;
+            this.sheetData.score.scoresAmount += 1;
+            this.sheetData.style.notesValidationCss.textContent += `[id="${note.id}"]{--note-color:${color}}`
+        }
 
-            const checkAndResolve = (isInitialCheck) => {
-                // Logik zur Score-Berechnung (unverändert)
-                let score;
-                if(this.sheetData.options.noteAnalyse == "declining"){
-                    score = note.score.length === 0 
-                    ? 0 
-                    : note.score.reduce((res, curr, i) => res + (curr * (note.score.length - i)), 0) / ((note.score.length * (note.score.length + 1)) / 2);
-                }else{
-                    score = note.score.length === 0 ? 0:note.score.reduce((res, curr) => res + curr)/note.score.length;
-                }
-
-                if (isInitialCheck) {
-                    this.sheetData.score.scoresSum += score;
-                    this.sheetData.score.scoresAmount += 1;
-                }
-
-                // Logik zum Färben und Prüfen (unverändert, außer Intervall-Logik)
-                flagAllpassed = true;
-                if (score > 0.90) {
-                    this.sheetData.style.notesValidationCss.textContent += `[id="${note.id}"]{fill:green}`;
-
-
-                } else if (score > 0.80) {
-                    this.sheetData.style.notesValidationCss.textContent += `[id="${note.id}"]{fill:yellow}`;
-
-                } else {
-                    flagAllpassed = false;
-                    if (this.sheetData.options.mode !== "learn") {
-                        this.sheetData.style.notesValidationCss.textContent += `[id="${note.id}"]{fill:red}`;
-                    }
-                }
-
-                // --- Kern der Promise-Logik ---
-
-                if (this.sheetData.options.mode === "learn" && !flagAllpassed) {
-                    // Im Lernmodus und nicht bestanden:
-                    // 1. MIDI pausieren (nur beim ersten Aufruf)
-                    
-                    // 2. Intervall starten (oder weiterlaufen lassen)
-                    if (intervalId === null) {
-                        intervalId = setInterval(() => {
-                            // Wiederhole die Prüfung im Intervall, bis resolved
-                            checkAndResolve(false);
-                        }, 50);
-                    }
-                    
-                    // Promise bleibt offen (kein resolve)
-                } else {
-                    // Lernmodus ODER Bestanden (flagAllpassed ist true)
-                    
-                    // 1. Intervall stoppen, falls aktiv
-                    if (intervalId) {
-                        clearInterval(intervalId);
-                        intervalId = null;
-                    }
-
-                    // 3. Promise auflösen, damit der nächste await-Schritt fortfahren kann
-                    resolve();
-                }
-            };
-
-            // Start der Prüfung
-            checkAndResolve(first);
-        });
+        return {valid:flagAllpassed,score:score};
     }
 
     toogleVolume(){
@@ -655,51 +739,66 @@ export class MusicEngine{
     async settings(){
         const instruments = this.sheetData.instruments; 
         const html = `
-            <label for="visible_instuments">
-                <h3 class="heading-3">Instrumente Sichtbarkeit</h3>
-                <select id="visible_instuments" multiple name="visible_instuments" data-defaults='${JSON.stringify(instruments.map(instrument => instrument.id))}'>
-                ${instruments.map(instrument => `
-                    <option value="${instrument.id}" ${instrument.visible?"selected": ""}>
-                        ${instrument.name}
+            <div class="settings_group">
+                <h2 class="heading-2">Instrumente</h2>
+                <label for="visible_instuments">
+                    <h3 class="heading-3">Sichtbar</h3>
+                    <select id="visible_instuments" multiple name="visible_instuments" data-defaults='${JSON.stringify(instruments.map(instrument => instrument.id))}'>
+                    ${instruments.map(instrument => `
+                        <option value="${instrument.id}" ${instrument.visible?"selected": ""}>
+                            ${instrument.name}
+                        </option>
+                    `).join(" ")}
+                    </select>
+                </label>
+                <label for="analyse_instuments">
+                    <h3 class="heading-3">Üben</h3>
+                    <select id="analyse_instuments" multiple name="analyse_instuments">
+                    ${instruments.map(instrument => `
+                        <option value="${instrument.id}" ${instrument.analyse?"selected": ""}>
+                            ${instrument.name}
                     </option>
-                `).join(" ")}
-                </select>
-            </label>
-            <label for="analyse_instuments">
-                <h3 class="heading-3">Instrumente Analysieren</h3>
-                <select id="analyse_instuments" multiple name="analyse_instuments">
-                ${instruments.map(instrument => `
-                    <option value="${instrument.id}" ${instrument.analyse?"selected": ""}>
-                        ${instrument.name}
-                </option>
-                `).join(" ")}
-                </select>
-            </label>
+                    `).join(" ")}
+                    </select>
+                </label>
+            </div>
+            <div class="settings_group">
+                <h2 class="heading-2">Ton-Diagramme</h2>
+                <lable>
+                    <h3>Beim Üben</h3>
+                    <input type="checkbox" name="showNoteDiagramsOnAnalyse" data-shape="toggle" ${this.sheetData.options.showNoteDiagramsOnAnalyse?"checked":""}>
+                </lable>
+                <lable>
+                    <h3>Bei Klick auf Note</h3>
+                    <input type="checkbox" name="showNoteDiagramOnTab" data-shape="toggle" ${this.sheetData.options.showNoteDiagramOnTab?"checked":""}>
+                </lable>
+            </div>
+            <lable>
+                <h3>Feedback anzeigen</h3>
+                <input type="checkbox" name="showReview" data-shape="toggle" ${this.sheetData.options.showReview?"checked":""}>
+            </lable>
             <label for="sheet_mode">
                 <h3 class="heading-3">Spielmodus</h3>
                 <select id="sheet_mode" name="mode"><option value="normal">Normal</option><option value="learn">Lernen</option></select>
             </label>
-            <label for="sheet_noteanalyse_method">
-                <h3 class="heading-3">Tonerkennung</h3>
-                <select id="sheet_noteanalyse_method" name="noteAnalyse"><option value="holding">Ton halten</option><option value="declining">Ton abfallend</option></select>
-            </label>
-            <label for="sheet_skipRest_method">
-                <h3 class="heading-3">Pausen überspringen</h3>
-                <select id="sheet_skipRest_method" name="skipRest"><option value="auto">automatisch</option><option value="ask">bestätigen</option><option value="never">nie</option></select>
-            </label>
-            <label for="sheet_showNoteNames_method">
-                <h3 class="heading-3">Notennamen anzeigen nach Instrumment</h3>
-                <select id="sheet_showNoteNames_method" name="showNoteNames" multiple>
-                    ${instruments.map(instrument => `
-                    <option value="${instrument.id}" ${this.sheetData.options.showNoteNames.includes(instrument.id)?"selected": ""}>
-                        ${instrument.name}
-                    </option>
-                `).join(" ")}
-                </select>
-            </label>
-            <details class="details">
-                <summary>Instrumente Transponieren</summary>
+            <div class="settings_group">
+                <h2 class="heading-2">Weiteres</h2>
+                <label for="sheet_skipRest_method">
+                    <h3 class="heading-3">Pausen überspringen</h3>
+                    <select id="sheet_skipRest_method" name="skipRest"><option value="auto">automatisch</option><option value="ask">bestätigen</option><option value="never">nie</option></select>
+                </label>
+                <label for="sheet_showNoteNames_method">
+                    <h3 class="heading-3">Notennamen</h3>
+                    <select id="sheet_showNoteNames_method" name="showNoteNames" multiple>
+                        ${instruments.map(instrument => `
+                        <option value="${instrument.id}" ${this.sheetData.options.showNoteNames.includes(instrument.id)?"selected": ""}>
+                            ${instrument.name}
+                        </option>
+                    `).join(" ")}
+                    </select>
+                </label>
                 <div>
+                    <h3 class="heading-3">Instrumente Transponieren</h3>
                     ${instruments.map(instrument => `
                         <label>
                             <h4 class="heading-4">${instrument.name}</h4>
@@ -709,7 +808,11 @@ export class MusicEngine{
 
                     `).join(" ")}
                 </div>
-            </details>
+                <label for="sheet_noteanalyse_method">
+                    <h3 class="heading-3">Toncharakteristik</h3>
+                    <select id="sheet_noteanalyse_method" name="noteAnalyse"><option value="holding">gleichmäßig</option><option value="declining">abfallend</option></select>
+                </label>
+            </div>
         `;
         const onInsertFunc = () =>{
             document.querySelector('#sheet_mode').value = this.sheetData.options.mode;
@@ -768,12 +871,16 @@ export class MusicEngine{
 
         
         if(dialogContent.submit){
-            
             const data = dialogContent.data;
+            console.log(data);
+
             this.sheetData.options.mode = data.mode;
             this.sheetData.options.skipRest = data.skipRest;
             this.sheetData.options.noteAnalyse = data.noteAnalyse;
             this.sheetData.options.showNoteNames = data.showNoteNames? data.showNoteNames.map(Number):[];
+            this.sheetData.options.showNoteDiagramsOnAnalyse = data.showNoteDiagramsOnAnalyse;
+            this.sheetData.options.showNoteDiagramOnTab = data.showNoteDiagramOnTab;
+            this.sheetData.options.showReview = data.showReview;
             await this.db_helper.setSheetOptions(this.sheetData.sheetId, this.sheetData.options);
 
             for(const transSemi of data.transSemi){
